@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container login-container">
+        <h1>Login</h1>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <p>Not registered? <a href="/signup.html">Sign up here</a></p>
+    </div>
+    <script src="/script.js"></script>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert('Please enter a valid email address');
+                return;
+            }
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const responseText = await response.text();
+                console.log('Login response:', { status: response.status, text: responseText });
+                if (!response.ok) throw new Error(`Login failed: ${response.status} - ${responseText}`);
+                console.log('Login successful, redirecting to dashboard');
+                window.location.href = '/dashboard.html';
+            } catch (err) {
+                console.error('Login fetch error:', err.message);
+                alert('Failed to log in: ' + err.message);
+            }
+        });
+    </script>
+</body>
+</html>

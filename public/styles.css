@@ -1,0 +1,475 @@
+/* Reset defaults */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #fff;
+    color: #333;
+    line-height: 1.6;
+    overflow: hidden;
+}
+
+/* Dashboard Container */
+.dashboard-container {
+    display: flex;
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 20px;
+    height: calc(100vh - 80px);
+}
+
+/* Login/Signup Container */
+.login-container {
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 16px;
+    margin-bottom: 5px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 250px;
+    padding: 20px 0;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+}
+
+.sidebar h1 {
+    font-family: 'Roboto', sans-serif;
+    font-size: 24px;
+    margin-bottom: 30px;
+    font-weight: 700;
+}
+
+.toc {
+    list-style: none;
+}
+
+.toc li {
+    margin: 15px 0;
+}
+
+.toc a, .toc button {
+    display: block;
+    padding: 10px 0;
+    color: #333;
+    text-decoration: none;
+    font-size: 16px;
+    transition: color 0.3s;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+}
+
+.toc a:hover, .toc button:hover {
+    color: #007bff;
+}
+
+.toc a.active {
+    color: #0056b3;
+    font-weight: bold;
+}
+
+#donateButton {
+    color: #28a745;
+    font-weight: bold;
+}
+
+#donateButton:hover {
+    color: #218838;
+}
+
+#logoutButton {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+#logoutButton:hover {
+    color: #c0392b;
+}
+
+#lessonJump {
+    width: 100%;
+    padding: 8px;
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+/* Add to existing styles.css after #lessonJump */
+#levelFilter {
+    width: 150px;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+/* Main Content */
+.content {
+    flex: 1;
+    margin-left: 290px;
+    padding: 20px 0;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.breadcrumb {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.content section {
+    display: none;
+}
+
+.content section.active {
+    display: block;
+}
+
+.content h2 {
+    font-family: 'Roboto', sans-serif;
+    font-size: 28px;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.content p {
+    font-size: 16px;
+    margin: 10px 0;
+}
+
+.progress-container {
+    width: 100%;
+    max-width: 400px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.progress-bar {
+    height: 20px;
+    background-color: #007bff;
+    width: 0%;
+    transition: width 0.3s;
+}
+
+#progressDetails {
+    font-size: 14px;
+    margin: 10px 0;
+}
+
+#progressTip {
+    font-size: 14px;
+    color: #007bff;
+    font-style: italic;
+}
+
+.scores-list, .reference-list {
+    list-style-type: none;
+    padding: 0;
+    font-size: 16px;
+}
+
+.scores-list li, .reference-list li {
+    margin: 10px 0;
+}
+
+.reference-list a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.reference-list a:hover {
+    text-decoration: underline;
+}
+
+.refCheckbox {
+    margin-right: 10px;
+}
+
+/* Lessons Section */
+.lesson {
+    margin: 15px 0;
+    transition: max-height 0.3s ease-out;
+}
+
+.lesson summary {
+    font-family: 'Roboto', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #333;
+    cursor: pointer;
+    padding: 10px 0;
+}
+
+.lesson-content {
+    padding: 15px 0;
+}
+
+.lesson-content h3 {
+    font-size: 20px;
+    margin: 15px 0 10px;
+}
+
+.lesson-content h4 {
+    font-size: 18px;
+    margin: 10px 0;
+}
+
+.lesson-content p {
+    margin: 10px 0;
+}
+
+.lesson-content form {
+    margin: 15px 0;
+}
+
+.lesson-content .questions {
+    margin-bottom: 15px;
+}
+
+.lesson-content input[type="text"],
+.lesson-content select {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    padding: 8px;
+    margin: 5px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.lesson-content button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px 0;
+    font-size: 16px;
+    display: block;
+}
+
+.lesson-content button:hover {
+    background-color: #0056b3;
+}
+
+.lesson-content .recordButton {
+    background-color: #2ecc71;
+}
+
+.lesson-content .recordButton:hover {
+    background-color: #27ae60;
+}
+
+/* Blog Section */
+.blog-post {
+    margin: 15px 0;
+    transition: max-height 0.3s ease-out;
+}
+
+.blog-post summary {
+    font-family: 'Roboto', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #333;
+    cursor: pointer;
+    padding: 10px 0;
+}
+
+.blog-post p {
+    margin: 10px 0;
+}
+
+.blog-post small {
+    font-size: 14px;
+    color: #666;
+}
+
+
+/* Add after .blog-post styles */
+.quiz {
+    margin: 15px 0;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+}
+
+.quiz h3 {
+    font-family: 'Roboto', sans-serif;
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.quiz p {
+    margin: 5px 0;
+}
+
+.startQuiz {
+    padding: 8px 15px;
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.startQuiz:hover {
+    background-color: #138496;
+}
+
+.quizContent {
+    margin-top: 10px;
+}
+
+.quizForm select, .quizForm input[type="text"] {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    padding: 8px;
+    margin: 5px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.quizForm button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px 0;
+    font-size: 16px;
+    display: block;
+}
+
+.quizForm button:hover {
+    background-color: #0056b3;
+}
+
+#achievements {
+    margin-top: 15px;
+}
+
+#achievements h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+#achievements ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+#achievements li {
+    font-size: 16px;
+    margin: 5px 0;
+    color: #28a745;
+}
+
+/* Add after #achievements styles */
+.badge-list {
+    list-style-type: none;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.badge-icon {
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+    margin-right: 5px;
+}
+
+
+#recommendation {
+    font-size: 16px;
+    color: #17a2b8;
+    margin: 10px 0;
+}
+
+/* Back to Top */
+#backToTop {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#backToTop:hover {
+    background-color: #0056b3;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-container {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .sidebar {
+        width: 100%;
+        position: static;
+        height: auto;
+        margin-bottom: 20px;
+    }
+
+    .content {
+        margin-left: 0;
+    }
+
+    .sidebar h1 {
+        font-size: 20px;
+    }
+
+    .toc a, .toc button {
+        font-size: 14px;
+    }
+
+    .content h2 {
+        font-size: 24px;
+    }
+}

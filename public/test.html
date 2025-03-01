@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test Speech</title></head>
+<body>
+    <button id="record">Record</button>
+    <span id="result"></span>
+    <script>
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        let isRecognizing = false;
+
+        const recordButton = document.getElementById('record');
+        const resultSpan = document.getElementById('result');
+
+        recordButton.addEventListener('click', () => {
+            if (isRecognizing) {
+                console.log('Already recognizing, please wait...');
+                return;
+            }
+            console.log('Starting recognition');
+            recognition.start();
+            isRecognizing = true;
+            recordButton.disabled = true;
+            resultSpan.textContent = 'Listening...';
+        });
+
+        recognition.onresult = (e) => {
+            const text = e.results[0][0].transcript;
+            console.log('Heard:', text);
+            resultSpan.textContent = text;
+            isRecognizing = false;
+            recordButton.disabled = false;
+        };
+
+        recognition.onerror = (e) => {
+            console.error('Error:', e.error, 'Full Event:', JSON.stringify(e, null, 2));
+            resultSpan.textContent = `Error: ${e.error}${e.error === 'network' ? ' - Check internet connection' : ''}`;
+            isRecognizing = false;
+            recordButton.disabled = false;
+        };
+
+        recognition.onend = () => {
+            console.log('Recognition ended');
+            if (resultSpan.textContent === 'Listening...') {
+                resultSpan.textContent = 'No speech detected';
+            }
+            isRecognizing = false;
+            recordButton.disabled = false;
+        };
+    </script>
+</body>
+</html>

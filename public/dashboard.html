@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Arial&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+    <div class="container dashboard-container">
+        <aside class="sidebar">
+            <h1>Welcome, <span id="username"></span>!</h1>
+            <ul class="toc">
+                <li><a href="#progress" class="active">Your Progress</a></li>
+                <li><a href="#homework-scores">Homework Scores</a></li>
+                <li><a href="#comprehension-scores">Comprehension Scores</a></li>
+                <li><a href="#pronunciation-scores">Pronunciation Scores</a></li>
+                <li><a href="#quiz-scores">Quiz Scores</a></li>
+                <li><a href="#lessons">Lessons</a></li>
+                <li><a href="#quizzes">Quizzes</a></li>
+                <li><a href="#reference">Reference</a></li>
+                <li><a href="#blog">Blog</a></li>
+                <li><a href="#leaderboard">Leaderboard</a></li>
+                <li><button id="donateButton">Donate</button></li>
+                <li><button id="logoutButton">Log Out</button></li>
+            </ul>
+            <select id="lessonJump">
+                <option value="">Jump to Lesson</option>
+            </select>
+        </aside>
+        <main class="content">
+            <div class="breadcrumb" id="breadcrumb">Dashboard</div>
+            <section id="progress" class="active">
+                <h2>Your Progress</h2>
+                <p>Total Score: <span id="score">0%</span></p>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <p>Tasks Completed: <span id="tasksCompleted">0/0</span></p>
+                <div id="progressDetails"></div>
+                <p id="progressTip"></p>
+                <p id="recommendation"></p>
+                <div id="achievements"></div>
+            </section>
+            <section id="homework-scores">
+                <h2>Homework Scores</h2>
+                <ul id="homeworkScores" class="scores-list">-</ul>
+            </section>
+            <section id="comprehension-scores">
+                <h2>Comprehension Scores</h2>
+                <ul id="comprehensionScores" class="scores-list">-</ul>
+            </section>
+            <section id="pronunciation-scores">
+                <h2>Pronunciation Scores</h2>
+                <ul id="pronunciationScores" class="scores-list">-</ul>
+            </section>
+            <section id="quiz-scores">
+                <h2>Quiz Scores</h2>
+                <ul id="quizScores" class="scores-list">-</ul>
+            </section>
+            <section id="lessons">
+                <h2>Lessons</h2>
+                <select id="levelFilter">
+                    <option value="">All Levels</option>
+                    <option value="A1">A1</option>
+                    <option value="A2">A2</option>
+                    <option value="B1">B1</option>
+                    <option value="B2">B2</option>
+                    <option value="C1">C1</option>
+                    <option value="C2">C2</option>
+                </select>
+                <div id="lessonList"></div>
+            </section>
+            <section id="quizzes">
+                <h2>Quizzes</h2>
+                <div id="quizList"></div>
+            </section>
+            <section id="reference">
+                <h2>Reference Materials</h2>
+                <p>Explore these resources to enhance your English skills:</p>
+                <ul id="referenceList" class="reference-list"></ul>
+            </section>
+            <section id="blog">
+                <h2>Blog</h2>
+                <div id="blogList"></div>
+            </section>
+            <section id="leaderboard">
+                <h2>Leaderboard</h2>
+                <ul id="leaderboardList" class="scores-list"></ul>
+            </section>
+        </main>
+        <button id="backToTop" style="display: none;">Back to Top</button>
+    </div>
+    <script src="/script.js"></script>
+    <script>
+        const stripe = Stripe('pk_test_your_stripe_publishable_key');
+
+    function updateProgressDetails(data) {
+        const homeworkCount = (data.homeworkScores || []).length;
+        const pronunciationCount = (data.pronunciationScores || []).filter(s => s.correct).length;
+        const comprehensionCount = (data.comprehensionScores || []).length;
+        const quizCount = (data.quizScores || []).length;
+        const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
+        const totalTasks = 12 * 3 + 2;
+        document.getElementById('score').textContent = `${data.score}%`;
+        document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
+        document.getElementById('progressBar').style.width = `${data.score}%`;
+        document.getElementById('progressDetails').innerHTML = `
+            Homework: ${homeworkCount}/12<br>
+            Comprehension: ${comprehensionCount}/12<br>
+            Pronunciation: ${pronunciationCount}/12<br>
+            Quizzes: ${quizCount}/2
+        `;
+        document.getElementById('progressTip').textContent = completedTasks < 20 ? 'Try more tasks to boost your score!' : 'Great progress—keep it up!';
+        document.getElementById('recommendation').textContent = data.recommendation;
+        const badgeImages = {
+    'Pronunciation Pro': '/images/pronunciation-pro.webp',
+    'Blog Explorer': '/images/blog-explorer.webp',
+    'Quiz Master': '/images/quiz-master.webp'
+};
+        document.getElementById('achievements').innerHTML = data.achievements.length > 0 
+            ? `<h3>Achievements</h3><ul class="badge-list">${data.achievements.map(a => `
+                <li><img src="${badgeImages[a.name]}" alt="${a.name}" class="badge-icon"> ${a.name} (Earned: ${new Date(a.dateEarned).toLocaleDateString()})</li>
+            `).join('')}</ul>`
+            : '<p>No achievements yet—keep learning!</p>';
+}
+
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            fetch('/logout', { method: 'GET' })
+                .then(response => { if (response.redirected) window.location.href = response.url; })
+                .catch(err => console.error('Logout error:', err));
+        });
+
+        document.getElementById('donateButton').addEventListener('click', () => {
+            fetch('/create-checkout-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(errData => { throw new Error(errData.error || 'Unknown server error'); });
+                }
+                return res.json();
+            })
+            .then(session => stripe.redirectToCheckout({ sessionId: session.id }))
+            .catch(err => {
+                console.error('Donation error:', err.message);
+                alert('Failed to initiate donation: ' + err.message);
+            });
+        });
+
+        document.querySelectorAll('.toc a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').substring(1);
+                const targetSection = document.getElementById(targetId);
+                if (targetSection) {
+                    document.querySelectorAll('.content section').forEach(section => {
+                        section.classList.remove('active');
+                    });
+                    document.querySelectorAll('.toc a').forEach(a => {
+                        a.classList.remove('active');
+                    });
+                    targetSection.classList.add('active');
+                    link.classList.add('active');
+                    document.getElementById('breadcrumb').textContent = `Dashboard > ${link.textContent}`;
+                } else {
+                    console.error('Target section not found:', targetId);
+                }
+            });
+        });
+
+        fetch('/user-data')
+            .then(res => {
+                if (!res.ok) {
+                    if (res.status === 401) window.location.href = '/index.html';
+                    throw new Error(`Failed to fetch user data: ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                console.log('User data received:', data);
+                document.getElementById('username').textContent = data.name;
+                document.getElementById('homeworkScores').innerHTML = data.homeworkScores && data.homeworkScores.length > 0 
+                    ? data.homeworkScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('')
+                    : '<li>No homework submitted</li>';
+                document.getElementById('comprehensionScores').innerHTML = data.comprehensionScores && data.comprehensionScores.length > 0 
+                    ? data.comprehensionScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('')
+                    : '<li>No comprehension submitted</li>';
+                document.getElementById('pronunciationScores').innerHTML = data.pronunciationScores && data.pronunciationScores.length > 0 
+                    ? data.pronunciationScores.map(s => `<li>${s.phrase}: ${s.correct ? 'Correct' : 'Incorrect'} (Attempts: ${s.attempts})</li>`).join('')
+                    : '<li>No pronunciations attempted</li>';
+                document.getElementById('quizScores').innerHTML = data.quizScores && data.quizScores.length > 0 
+                    ? data.quizScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('')
+                    : '<li>No quizzes completed</li>';
+                updateProgressDetails(data);
+
+                // Fetch lessons
+                let allLessons = [];
+                
+                fetch('/lessons')
+    .then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch lessons: ${res.status}`);
+        return res.json();
+    })
+    .then(lessons => {
+        console.log('Lessons received:', lessons);
+        allLessons = lessons;
+        const lessonList = document.getElementById('lessonList');
+        const lessonJump = document.getElementById('lessonJump');
+        const levelFilter = document.getElementById('levelFilter');
+
+        function renderLessons(filterLevel) {
+            lessonList.innerHTML = `
+                ${allLessons.filter(lesson => !filterLevel || lesson.level === filterLevel).map(lesson => `
+                    <details class="lesson" id="lesson-${lesson._id}">
+                        <summary>${lesson.title} (${lesson.level})</summary>
+                        <div class="lesson-content">
+                            <h3>Reading Section</h3>
+                            <p>${lesson.content}</p>
+                            ${lesson.comprehension && lesson.comprehension.questions && lesson.comprehension.questions.length > 0 ? `
+                                <h4>Reading Comprehension</h4>
+                                <form class="comprehensionForm" data-lesson-id="${lesson._id}">
+                                    <div class="questions">
+                                        ${lesson.comprehension.questions.map((q, i) => `
+                                            <p>${q.question}</p>
+                                            <label><input type="radio" name="answer${i}" value="true" required> Yes/True</label>
+                                            <label><input type="radio" name="answer${i}" value="false"> No/False</label>
+                                        `).join('')}
+                                    </div>
+                                    <button type="submit">Submit Comprehension</button>
+                                </form>
+                            ` : ''}
+                            ${lesson.homework ? `
+                                <h4>Homework (${lesson.level})</h4>
+                                <form class="homeworkForm" data-lesson-id="${lesson._id}">
+                                    ${lesson.homework.map((q, i) => `
+                                        <p>${q.question}</p>
+                                        ${q.type === 'fill-in' ? `
+                                            <input type="text" name="answer${i}" placeholder="Your answer" required>
+                                        ` : `
+                                            <select name="answer${i}" required>
+                                                ${q.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                                            </select>
+                                        `}
+                                    `).join('')}
+                                    <button type="submit">Submit Homework</button>
+                                </form>
+                            ` : ''}
+                            ${lesson.pronunciation ? `
+                                <h4>Practice Pronunciation</h4>
+                                ${lesson.pronunciation.map((p, i) => `
+                                    <p>${p.phrase}</p>
+                                    <button class="recordButton" data-phrase="${p.phrase}" data-lesson-id="${lesson._id}" data-result-id="result-${lesson._id}-${i}">Record</button>
+                                    <span id="result-${lesson._id}-${i}"></span>
+                                `).join('')}
+                            ` : ''}
+                        </div>
+                    </details>
+                `).join('')}
+            `;
+        }
+
+        renderLessons('');
+        lessons.forEach(lesson => {
+            const option = document.createElement('option');
+            option.value = `lesson-${lesson._id}`;
+            option.textContent = `${lesson.title} (${lesson.level})`;
+            lessonJump.appendChild(option);
+        });
+        lessonJump.addEventListener('change', (e) => {
+            const targetId = e.target.value;
+            const target = document.getElementById(targetId);
+            if (target) {
+                document.querySelectorAll('.content section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                document.querySelectorAll('.toc a').forEach(a => {
+                    a.classList.remove('active');
+                });
+                document.getElementById('lessons').classList.add('active');
+                document.querySelector('.toc a[href="#lessons"]').classList.add('active');
+                target.scrollIntoView({ behavior: 'smooth' });
+                target.open = true;
+                document.getElementById('breadcrumb').textContent = `Dashboard > Lessons > ${target.querySelector('summary').textContent}`;
+            }
+            e.target.value = '';
+        });
+        levelFilter.addEventListener('change', (e) => {
+            renderLessons(e.target.value);
+        });
+
+                        // Fetch references
+                        fetch('/references')
+                            .then(res => {
+                                if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
+                                return res.json();
+                            })
+                            .then(references => {
+                                console.log('References received:', references);
+                                const referenceList = document.getElementById('referenceList');
+                                referenceList.innerHTML = references.length > 0 
+                                    ? references.map(ref => `
+                                        <li>
+                                            <input type="checkbox" class="refCheckbox" data-id="${ref._id}" ${data.referencesVisited.includes(ref._id) ? 'checked' : ''}>
+                                            <a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}
+                                        </li>
+                                    `).join('')
+                                    : '<li>No references available</li>';
+                                document.querySelectorAll('.refCheckbox').forEach(checkbox => {
+                                    checkbox.addEventListener('change', async (e) => {
+                                        const refId = e.target.dataset.id;
+                                        if (e.target.checked) {
+                                            await fetch('/mark-reference-visited', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ referenceId: refId })
+                                            });
+                                            console.log('Marked reference visited:', refId);
+                                            fetch('/user-data').then(res => res.json()).then(updateData => {
+                                                updateProgressDetails(updateData);
+                                            });
+                                        }
+                                    });
+                                });
+                            })
+                            .catch(err => console.error('Error loading references:', err));
+
+                        // Fetch blogs
+                        fetch('/blogs')
+                            .then(res => {
+                                if (!res.ok) throw new Error(`Failed to fetch blogs: ${res.status}`);
+                                return res.json();
+                            })
+                            .then(blogs => {
+                                console.log('Blogs received:', blogs);
+                                const blogList = document.getElementById('blogList');
+                                blogList.innerHTML = `
+                                    ${blogs.map(blog => `
+                                        <details class="blog-post">
+                                            <summary>${blog.title}</summary>
+                                            <p>${blog.content}</p>
+                                            <small>Posted on: ${new Date(blog.createdAt).toLocaleDateString()}</small>
+                                        </details>
+                                    `).join('')}
+                                `;
+                            })
+                            .catch(err => console.error('Error loading blogs:', err));
+
+                        // Fetch leaderboard
+                        fetch('/leaderboard')
+                            .then(res => {
+                                if (!res.ok) throw new Error(`Failed to fetch leaderboard: ${res.status}`);
+                                return res.json();
+                            })
+                            .then(users => {
+                                console.log('Leaderboard received:', users);
+                                const leaderboardList = document.getElementById('leaderboardList');
+                                leaderboardList.innerHTML = users.length > 0 
+                                    ? users.map((user, index) => `
+                                        <li>${index + 1}. ${user.name}: ${user.score}%</li>
+                                    `).join('')
+                                    : '<li>No users ranked yet</li>';
+                            })
+                            .catch(err => console.error('Error loading leaderboard:', err));
+
+                        // Fetch quizzes
+                        fetch('/quizzes')
+                            .then(res => {
+                                if (!res.ok) throw new Error(`Failed to fetch quizzes: ${res.status}`);
+                                return res.json();
+                            })
+                            .then(quizzes => {
+                                console.log('Quizzes received:', quizzes);
+                                const quizList = document.getElementById('quizList');
+                                quizList.innerHTML = `
+                                    ${quizzes.map(quiz => `
+                                        <div class="quiz" data-id="${quiz._id}">
+                                            <h3>${quiz.title} (${quiz.level})</h3>
+                                            <p>Time Limit: ${quiz.timeLimit} seconds</p>
+                                            <button class="startQuiz" data-id="${quiz._id}">Start Quiz</button>
+                                            <div class="quizContent" style="display: none;"></div>
+                                        </div>
+                                    `).join('')}
+                                `;
+                                document.querySelectorAll('.startQuiz').forEach(button => {
+                                    button.addEventListener('click', () => {
+                                        const quizId = button.dataset.id;
+                                        const quiz = quizzes.find(q => q._id === quizId);
+                                        const quizContent = button.nextElementSibling;
+                                        quizContent.style.display = 'block';
+                                        button.style.display = 'none';
+                                        let timeLeft = quiz.timeLimit;
+                                        quizContent.innerHTML = `
+                                            <p>Time Remaining: <span id="timer-${quizId}">${timeLeft}</span> seconds</p>
+                                            <form class="quizForm" data-id="${quizId}">
+                                                ${quiz.type === 'matching' ? `
+                                                    ${quiz.questions.map((q, i) => `
+                                                        <p>${q.prompt}</p>
+                                                        <select name="answer${i}" required>
+                                                            ${quiz.questions.map(opt => `<option value="${opt.correctAnswer}">${opt.correctAnswer}</option>`).join('')}
+                                                        </select>
+                                                    `).join('')}
+                                                ` : `
+                                                    ${quiz.questions.map((q, i) => `
+                                                        <p>${q.prompt}</p>
+                                                        <input type="text" name="answer${i}" required>
+                                                    `).join('')}
+                                                `}
+                                                <button type="submit">Submit Quiz</button>
+                                            </form>
+                                        `;
+                                        const timer = setInterval(() => {
+                                            timeLeft--;
+                                            document.getElementById(`timer-${quizId}`).textContent = timeLeft;
+                                            if (timeLeft <= 0) {
+                                                clearInterval(timer);
+                                                document.querySelector(`form[data-id="${quizId}"]`).dispatchEvent(new Event('submit'));
+                                            }
+                                        }, 1000);
+
+                                        document.querySelector(`form[data-id="${quizId}"]`).addEventListener('submit', async (e) => {
+                                            e.preventDefault();
+                                            clearInterval(timer);
+                                            const answers = Array.from(e.target.querySelectorAll('select, input')).map(input => input.value);
+                                            try {
+                                                const response = await fetch('/submit-quiz', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ quizId, answers })
+                                                });
+                                                const responseText = await response.text();
+                                                console.log('Quiz response:', { status: response.status, text: responseText });
+                                                if (!response.ok) throw new Error(`Quiz fetch failed: ${response.status} - ${responseText}`);
+                                                const result = JSON.parse(responseText);
+                                                console.log('Quiz result:', result);
+                                                const percentage = Math.round((result.score / result.total) * 100);
+                                                let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
+                                                result.feedback.forEach(f => {
+                                                    feedback += `${f.prompt}: ${f.correct ? 'Correct!' : `Wrong, answer: ${f.correctAnswer}`}\n`;
+                                                });
+                                                alert(feedback);
+                                                fetch('/user-data').then(res => res.json()).then(updateData => {
+                                                    document.getElementById('quizScores').innerHTML = updateData.quizScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('');
+                                                    updateProgressDetails(updateData);
+                                                });
+                                                quizContent.style.display = 'none';
+                                                button.style.display = 'block';
+                                            } catch (err) {
+                                                console.error('Quiz fetch error:', err.message);
+                                                alert('Failed to submit quiz: ' + err.message);
+                                            }
+                                        });
+                                    });
+                                });
+                            })
+                            .catch(err => console.error('Error loading quizzes:', err));
+
+                        document.querySelectorAll('.homeworkForm').forEach(form => {
+                            form.addEventListener('submit', async (e) => {
+                                e.preventDefault();
+                                const lessonId = form.dataset.lessonId;
+                                const answers = Array.from(form.querySelectorAll('input, select')).map(input => input.value);
+                                console.log('Submitting homework:', { lessonId, answers });
+                                try {
+                                    const response = await fetch('/homework', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ lessonId, answers })
+                                    });
+                                    const responseText = await response.text();
+                                    console.log('Homework response:', { status: response.status, text: responseText });
+                                    if (!response.ok) throw new Error(`Homework fetch failed: ${response.status} - ${responseText}`);
+                                    const result = JSON.parse(responseText);
+                                    console.log('Homework result:', result);
+                                    const percentage = Math.round((result.score / result.total) * 100);
+                                    let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
+                                    result.feedback.forEach(f => {
+                                        feedback += `${f.question}: ${f.correct ? 'Correct!' : `Wrong, try: ${f.correctAnswer}`}\n`;
+                                    });
+                                    alert(feedback);
+                                    fetch('/user-data').then(res => res.json()).then(updateData => {
+                                        document.getElementById('homeworkScores').innerHTML = updateData.homeworkScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('');
+                                        updateProgressDetails(updateData);
+                                    });
+                                } catch (err) {
+                                    console.error('Homework fetch error:', err.message);
+                                    alert('Failed to submit homework: ' + err.message);
+                                }
+                            });
+                        });
+
+                        document.querySelectorAll('.comprehensionForm').forEach(form => {
+                            form.addEventListener('submit', async (e) => {
+                                e.preventDefault();
+                                const lessonId = form.dataset.lessonId;
+                                const answers = Array.from(form.querySelectorAll('input:checked')).map(input => input.value === 'true');
+                                console.log('Submitting comprehension:', { lessonId, answers });
+                                try {
+                                    const response = await fetch('/comprehension', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ lessonId, answers })
+                                    });
+                                    const responseText = await response.text();
+                                    console.log('Comprehension response:', { status: response.status, text: responseText });
+                                    if (!response.ok) throw new Error(`Comprehension fetch failed: ${response.status} - ${responseText}`);
+                                    const result = JSON.parse(responseText);
+                                    console.log('Comprehension result:', result);
+                                    const percentage = Math.round((result.score / result.total) * 100);
+                                    let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
+                                    result.feedback.forEach(f => {
+                                        feedback += `${f.question}: ${f.correct ? 'Correct!' : `Wrong, answer: ${f.correctAnswer ? 'Yes/True' : 'No/False'}`}\n`;
+                                    });
+                                    alert(feedback);
+                                    fetch('/user-data').then(res => res.json()).then(updateData => {
+                                        document.getElementById('comprehensionScores').innerHTML = updateData.comprehensionScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('');
+                                        updateProgressDetails(updateData);
+                                    });
+                                } catch (err) {
+                                    console.error('Comprehension fetch error:', err.message);
+                                    alert('Failed to submit comprehension: ' + err.message);
+                                }
+                            });
+                        });
+
+                        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                        recognition.lang = 'en-US';
+                        recognition.interimResults = false;
+                        recognition.maxAlternatives = 1;
+                        let isRecognizing = false;
+
+                        document.querySelectorAll('.recordButton').forEach(button => {
+                            button.addEventListener('click', () => {
+                                if (isRecognizing) {
+                                    console.log('Already recognizing, please wait...');
+                                    return;
+                                }
+                                const phrase = button.dataset.phrase;
+                                const lessonId = button.dataset.lessonId;
+                                const resultId = button.dataset.resultId;
+                                const resultSpan = document.getElementById(resultId);
+
+                                console.log('Starting recognition for:', phrase);
+                                recognition.start();
+                                isRecognizing = true;
+                                button.disabled = true;
+                                resultSpan.textContent = 'Listening...';
+
+                                recognition.onresult = (event) => {
+                                    const spokenText = event.results[0][0].transcript.replace(/’/g, "'").toLowerCase().trim();
+                                    const expectedText = phrase.replace(/’/g, "'").toLowerCase().trim();
+                                    console.log('Heard:', spokenText, 'Expected:', expectedText);
+                                    const isCorrect = spokenText === expectedText;
+                                    resultSpan.textContent = isCorrect ? 'Correct!' : `Try again: heard "${spokenText}"`;
+                                    isRecognizing = false;
+                                    button.disabled = false;
+
+                                    fetch('/pronunciation', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ lessonId, phrase, isCorrect })
+                                    })
+                                    .then(res => res.text().then(text => ({ ok: res.ok, status: res.status, text })))
+                                    .then(({ ok, status, text }) => {
+                                        if (!ok) throw new Error(`Pronunciation save failed: ${status} - ${text}`);
+                                        console.log('Pronunciation saved successfully:', text);
+                                        fetch('/user-data').then(res => res.json()).then(updateData => {
+                                            document.getElementById('pronunciationScores').innerHTML = updateData.pronunciationScores.map(s => `<li>${s.phrase}: ${s.correct ? 'Correct' : 'Incorrect'} (Attempts: ${s.attempts})</li>`).join('');
+                                            updateProgressDetails(updateData);
+                                        });
+                                    })
+                                    .catch(err => {
+                                        console.error('Pronunciation save error:', err.message);
+                                        alert('Failed to save pronunciation: ' + err.message);
+                                    });
+                                };
+
+                                recognition.onerror = (event) => {
+                                    console.error('Recognition error:', event.error);
+                                    resultSpan.textContent = `Error: ${event.error}${event.error === 'network' ? ' - Check internet connection' : ''}`;
+                                    isRecognizing = false;
+                                    button.disabled = false;
+                                };
+
+                                recognition.onend = () => {
+                                    console.log('Recognition ended');
+                                    if (!resultSpan.textContent || resultSpan.textContent === 'Listening...') {
+                                        resultSpan.textContent = 'No speech detected';
+                                    }
+                                    isRecognizing = false;
+                                    button.disabled = false;
+                                };
+                            });
+                        });
+
+                        document.querySelectorAll('.lesson summary').forEach(summary => {
+                            summary.addEventListener('click', () => {
+                                const lessonTitle = summary.textContent;
+                                document.getElementById('breadcrumb').textContent = `Dashboard > Lessons > ${lessonTitle}`;
+                            });
+                        });
+
+                        document.querySelectorAll('.blog-post summary').forEach(summary => {
+                            summary.addEventListener('click', () => {
+                                const blogTitle = summary.textContent;
+                                document.getElementById('breadcrumb').textContent = `Dashboard > Blog > ${blogTitle}`;
+                            });
+                        });
+                    })
+                    .catch(err => console.error('Error loading lessons:', err));
+                const backToTop = document.getElementById('backToTop');
+                document.querySelector('.content').addEventListener('scroll', () => {
+                    backToTop.style.display = document.querySelector('.content').scrollTop > 300 ? 'block' : 'none';
+                });
+                backToTop.addEventListener('click', () => {
+                    document.querySelector('.content').scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            })
+            .catch(err => {
+                console.error('Dashboard fetch error:', err.message);
+                if (err.message.includes('401')) window.location.href = '/index.html';
+            });
+    </script>
+</body>
+</html>

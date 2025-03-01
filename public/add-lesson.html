@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Lesson</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Add a New Lesson</h1>
+        <form id="addLessonForm">
+            <label for="title">Lesson Title:</label>
+            <input type="text" id="title" name="title" required>
+            <label for="content">Grammar Explanation:</label>
+            <textarea id="content" name="content" rows="6" required placeholder="Detailed explanation of grammar point..."></textarea>
+            
+            <h3>Reading Comprehension</h3>
+            <label for="comprehensionText">Text:</label>
+            <textarea id="comprehensionText" name="comprehensionText" rows="4" placeholder="Enter reading passage..."></textarea>
+            <div id="comprehensionFields">
+                <div class="comprehension-field">
+                    <label>Question:</label>
+                    <input type="text" name="question" placeholder="e.g., Is it sunny today?">
+                    <label>Answer:</label>
+                    <select name="correctAnswer">
+                        <option value="true">True/Yes</option>
+                        <option value="false">False/No</option>
+                    </select>
+                    <button type="button" class="remove-field">Remove</button>
+                </div>
+            </div>
+            <button type="button" id="addComprehension">Add Comprehension Question</button>
+
+            <h3>Homework Questions</h3>
+            <div id="homeworkFields">
+                <div class="homework-field">
+                    <label>Question:</label>
+                    <input type="text" name="question" placeholder="e.g., She ___ (go) to work">
+                    <label>Type:</label>
+                    <select name="type">
+                        <option value="fill-in">Fill-in</option>
+                        <option value="multiple-choice">Multiple Choice</option>
+                    </select>
+                    <label>Correct Answer:</label>
+                    <input type="text" name="correctAnswer" placeholder="e.g., goes">
+                    <label>Options (for multiple choice, comma-separated):</label>
+                    <input type="text" name="options" placeholder="e.g., goes, go, going">
+                    <button type="button" class="remove-field">Remove</button>
+                </div>
+            </div>
+            <button type="button" id="addHomework">Add Homework Question</button>
+
+            <h3>Pronunciation Phrases</h3>
+            <div id="pronunciationFields">
+                <div class="pronunciation-field">
+                    <label>Phrase:</label>
+                    <input type="text" name="phrase" placeholder="e.g., I enjoy swimming">
+                    <button type="button" class="remove-field">Remove</button>
+                </div>
+            </div>
+            <button type="button" id="addPronunciation">Add Pronunciation Phrase</button>
+
+            <button type="submit">Add Lesson</button>
+            <a href="/dashboard.html">Back to Dashboard</a>
+        </form>
+    </div>
+    <script>
+        document.getElementById('addComprehension').addEventListener('click', () => {
+            const fields = document.getElementById('comprehensionFields');
+            const newField = fields.querySelector('.comprehension-field').cloneNode(true);
+            newField.querySelector('input[name="question"]').value = '';
+            fields.appendChild(newField);
+        });
+
+        document.getElementById('addHomework').addEventListener('click', () => {
+            const fields = document.getElementById('homeworkFields');
+            const newField = fields.querySelector('.homework-field').cloneNode(true);
+            newField.querySelectorAll('input').forEach(input => input.value = '');
+            fields.appendChild(newField);
+        });
+
+        document.getElementById('addPronunciation').addEventListener('click', () => {
+            const fields = document.getElementById('pronunciationFields');
+            const newField = fields.querySelector('.pronunciation-field').cloneNode(true);
+            newField.querySelector('input').value = '';
+            fields.appendChild(newField);
+        });
+
+        document.querySelectorAll('.remove-field').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const field = e.target.parentElement;
+                if (field.parentElement.children.length > 1) field.remove();
+            });
+        });
+
+        document.getElementById('addLessonForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('title').value;
+            const content = document.getElementById('content').value;
+            const comprehensionText = document.getElementById('comprehensionText').value;
+            const comprehensionQuestions = Array.from(document.querySelectorAll('.comprehension-field')).map(field => ({
+                question: field.querySelector('input[name="question"]').value,
+                correctAnswer: field.querySelector('select[name="correctAnswer"]').value === 'true'
+            }));
+            const homework = Array.from(document.querySelectorAll('.homework-field')).map(field => {
+                const options = field.querySelector('input[name="options"]').value.split(',').map(opt => opt.trim()).filter(opt => opt);
+                return {
+                    question: field.querySelector('input[name="question"]').value,
+                    type: field.querySelector('select[name="type"]').value,
+                    correctAnswer: field.querySelector('input[name="correctAnswer"]').value,
+                    ...(options.length > 0 && { options })
+                };
+            });
+            const pronunciation = Array.from(document.querySelectorAll('.pronunciation-field')).map(field => ({
+                phrase: field.querySelector('input[name="phrase"]').value
+            }));
+
+            try {
+                const response = await fetch('/lessons', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        title, 
+                        content, 
+                        comprehension: { text: comprehensionText, questions: comprehensionQuestions }, 
+                        homework, 
+                        pronunciation 
+                    })
+                });
+                if (response.ok) {
+                    alert('Lesson added successfully!');
+                    window.location.href = '/dashboard.html';
+                } else {
+                    const errorText = await response.text();
+                    alert(`Failed to add lesson: ${errorText}`);
+                }
+            } catch (err) {
+                console.error('Add lesson error:', err);
+                alert('Failed to add lesson: Network or server error');
+            }
+        });
+    </script>
+</body>
+</html>
