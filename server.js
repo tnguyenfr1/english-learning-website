@@ -91,6 +91,7 @@ app.post('/api/signup', async (req, res) => {
 
 // User Data Endpoint
 app.get('/api/user-data', async (req, res) => {
+    console.log('User data request, session:', req.session);
     if (!req.session.userId) {
         console.log('No session userId');
         return res.status(401).send('Not logged in');
@@ -121,7 +122,7 @@ app.get('/api/user-data', async (req, res) => {
 
 // Logout Endpoint
 app.get('/api/logout', (req, res) => {
-    console.log('Logout attempt');
+    console.log('Logout attempt, session:', req.session);
     req.session.destroy((err) => {
         if (err) {
             console.error('Logout error:', err);
