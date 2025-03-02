@@ -17,15 +17,36 @@ const mongoOptions = {
     useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000, // 5s timeout
     connectTimeoutMS: 10000, // 10s connect timeout
-    maxPoolSize: 10 // Connection pooling for serverless
+    maxPoolSize: 10 // Connection pooling
 };
 
-// Connect to MongoDB once at startup
+// Initial MongoDB connection attempt
 mongoose.connect(mongoURI, mongoOptions)
-    .then(() => console.log('Connected to MongoDB Atlas - english_learning'))
-    .catch(err => console.error('Initial MongoDB connection error:', err.message));
+    .then(() => console.log('Initial connection to MongoDB Atlas successful'))
+    .catch(err => console.error('Initial MongoDB connection failed:', err.message));
 
-// Middleware for session
+// Ensure DB connection with retry
+async function ensureDBConnection() {
+    const maxRetries = 3;
+    let attempts = 0;
+    while (mongoose.connection.readyState !== 1 && attempts < maxRetries) {
+        attempts++;
+        try {
+            await mongoose.connect(mongoURI, mongoOptions);
+            console.log(`MongoDB reconnected after ${attempts} attempts`);
+            return true;
+        } catch (err) {
+            console.error(`MongoDB connection attempt ${attempts} failed:`, err.message);
+            if (attempts === maxRetries) {
+                console.error('Max retries reached, using fallback data');
+                return false;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+        }
+    }
+    return mongoose.connection.readyState === 1;
+}
+
 app.use(session({
     secret: 'your-secret-key',
     resave: false,
@@ -142,7 +163,8 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Login attempt:', { email });
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, using fallback login');
             req.session.userId = 'fallback-id';
             return res.status(200).send();
@@ -171,7 +193,8 @@ app.post('/api/signup', async (req, res) => {
     const { email, password, name } = req.body;
     console.log('Signup attempt:', { email });
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, signup failed');
             return res.status(500).json({ error: 'Database unavailable, signup failed' });
         }
@@ -199,7 +222,8 @@ app.get('/api/user-data', async (req, res) => {
         return res.status(401).send('Not logged in');
     }
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, using fallback data');
             return res.json({ 
                 name: 'Fallback User', 
@@ -235,7 +259,8 @@ app.get('/api/user-data', async (req, res) => {
 app.get('/lessons', async (req, res) => {
     console.log('Lessons request');
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, using sample lessons');
             return res.json([
                 { _id: '1', title: 'Sample Lesson 1', content: 'This is a sample lesson.', level: 'B1', createdAt: new Date() }
@@ -258,7 +283,8 @@ app.get('/lessons', async (req, res) => {
 app.get('/references', async (req, res) => {
     console.log('References request');
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, using sample references');
             return res.json([
                 { _id: '1', title: 'Sample Reference', url: 'https://example.com', description: 'A sample resource' }
@@ -277,7 +303,8 @@ app.get('/references', async (req, res) => {
 app.get('/blogs', async (req, res) => {
     console.log('Blogs request');
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, using sample blogs');
             return res.json([
                 { _id: '1', title: 'Sample Blog', content: 'This is a sample blog post.', createdAt: new Date() }
@@ -296,7 +323,8 @@ app.get('/blogs', async (req, res) => {
 app.get('/quizzes', async (req, res) => {
     console.log('Quizzes request');
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, using sample quizzes');
             return res.json([
                 { _id: '1', title: 'Sample Quiz', type: 'fill-in', questions: [{ prompt: 'What is 2+2?', correctAnswer: '4' }], timeLimit: 60, level: 'B1', createdAt: new Date() }
@@ -319,7 +347,8 @@ app.get('/quizzes', async (req, res) => {
 app.get('/leaderboard', async (req, res) => {
     console.log('Leaderboard request');
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, using sample leaderboard');
             return res.json([{ name: 'Fallback User', score: 49 }]);
         }
@@ -345,7 +374,8 @@ app.post('/comprehension', async (req, res) => {
     }
     const { lessonId, answers } = req.body;
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, comprehension failed');
             return res.status(500).json({ error: 'Database unavailable' });
         }
@@ -390,7 +420,8 @@ app.post('/homework', async (req, res) => {
     }
     const { lessonId, answers } = req.body;
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, homework failed');
             return res.status(500).json({ error: 'Database unavailable' });
         }
@@ -435,7 +466,8 @@ app.post('/submit-quiz', async (req, res) => {
     }
     const { quizId, answers } = req.body;
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, quiz submission failed');
             return res.status(500).json({ error: 'Database unavailable' });
         }
@@ -480,7 +512,8 @@ app.post('/pronunciation', async (req, res) => {
     }
     const { lessonId, phrase, isCorrect } = req.body;
     try {
-        if (!mongoose.connection.readyState) {
+        const dbReady = await ensureDBConnection();
+        if (!dbReady) {
             console.log('DB not connected, pronunciation failed');
             return res.status(500).json({ error: 'Database unavailable' });
         }
