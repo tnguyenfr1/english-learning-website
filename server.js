@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
-const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey'); // Replace with your real key
+const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey');
 const app = express();
 
 app.use(express.json());
@@ -10,16 +10,31 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password> with your real password
+const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; 
 let dbConnected = false;
 
-// Connect to MongoDB at startup
-mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => {
-        console.log('Connected to MongoDB Atlas - english_learning');
-        dbConnected = true;
-    })
-    .catch(err => console.error('MongoDB connection error:', err.message));
+mongoose.set('bufferCommands', false); 
+const mongoOptions = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000, // 5s timeout
+    connectTimeoutMS: 10000 // 10s connect timeout
+};
+
+// Connect to MongoDB with retry logic
+async function connectToMongoDB() {
+    try {
+        if (!dbConnected) {
+            await mongoose.connect(mongoURI, mongoOptions);
+            console.log('Connected to MongoDB Atlas - english_learning');
+            dbConnected = true;
+        }
+    } catch (err) {
+        console.error('MongoDB connection error:', err.message);
+        dbConnected = false;
+    }
+}
+connectToMongoDB();
 
 app.use(session({
     secret: 'your-secret-key',
@@ -81,6 +96,7 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Login attempt:', { email });
     try {
+        await connectToMongoDB(); // Reconnect if needed
         if (!dbConnected) {
             console.log('DB not connected, using fallback login');
             req.session.userId = 'fallback-id';
@@ -110,6 +126,7 @@ app.post('/api/signup', async (req, res) => {
     const { email, password, name } = req.body;
     console.log('Signup attempt:', { email });
     try {
+        await connectToMongoDB(); // Reconnect if needed
         if (!dbConnected) {
             console.log('DB not connected, signup failed');
             return res.status(500).json({ error: 'Database unavailable, signup failed' });
@@ -138,6 +155,7 @@ app.get('/api/user-data', async (req, res) => {
         return res.status(401).send('Not logged in');
     }
     try {
+        await connectToMongoDB(); // Reconnect if needed
         if (!dbConnected) {
             console.log('DB not connected, using fallback data');
             return res.json({ 
@@ -173,6 +191,7 @@ app.get('/api/user-data', async (req, res) => {
 app.get('/lessons', async (req, res) => {
     console.log('Lessons request');
     try {
+        await connectToMongoDB(); // Reconnect if needed
         if (!dbConnected) {
             console.log('DB not connected, using sample lessons');
             return res.json([
@@ -192,6 +211,7 @@ app.get('/lessons', async (req, res) => {
 app.get('/references', async (req, res) => {
     console.log('References request');
     try {
+        await connectToMongoDB(); // Reconnect if needed
         if (!dbConnected) {
             console.log('DB not connected, using sample references');
             return res.json([
@@ -211,6 +231,7 @@ app.get('/references', async (req, res) => {
 app.get('/blogs', async (req, res) => {
     console.log('Blogs request');
     try {
+        await connectToMongoDB(); // Reconnect if needed
         if (!dbConnected) {
             console.log('DB not connected, using sample blogs');
             return res.json([
@@ -230,6 +251,7 @@ app.get('/blogs', async (req, res) => {
 app.get('/quizzes', async (req, res) => {
     console.log('Quizzes request');
     try {
+        await connectToMongoDB(); // Reconnect if needed
         if (!dbConnected) {
             console.log('DB not connected, using sample quizzes');
             return res.json([
@@ -249,6 +271,7 @@ app.get('/quizzes', async (req, res) => {
 app.get('/leaderboard', async (req, res) => {
     console.log('Leaderboard request');
     try {
+        await connectToMongoDB(); // Reconnect if needed
         if (!dbConnected) {
             console.log('DB not connected, using sample leaderboard');
             return res.json([{ name: 'Fallback User', score: 49 }]);
