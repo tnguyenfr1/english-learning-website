@@ -10,35 +10,22 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password> with your real password
-let dbConnected = false;
-
+const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password>
 mongoose.set('bufferCommands', false); // Disable buffering for serverless
 const mongoOptions = {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000, // 5s timeout
-    connectTimeoutMS: 10000 // 10s connect timeout
+    connectTimeoutMS: 10000, // 10s connect timeout
+    maxPoolSize: 10 // Connection pooling for serverless
 };
 
-// Connect to MongoDB with retry logic
-async function connectToMongoDB() {
-    try {
-        if (!mongoose.connection.readyState) { // Only connect if not already connected
-            await mongoose.connect(mongoURI, mongoOptions);
-            console.log('Connected to MongoDB Atlas - english_learning');
-            dbConnected = true;
-        } else {
-            console.log('MongoDB already connected');
-            dbConnected = true;
-        }
-    } catch (err) {
-        console.error('MongoDB connection error:', err.message);
-        dbConnected = false;
-    }
-}
-connectToMongoDB();
+// Connect to MongoDB once at startup
+mongoose.connect(mongoURI, mongoOptions)
+    .then(() => console.log('Connected to MongoDB Atlas - english_learning'))
+    .catch(err => console.error('Initial MongoDB connection error:', err.message));
 
+// Middleware for session
 app.use(session({
     secret: 'your-secret-key',
     resave: false,
@@ -114,20 +101,20 @@ async function updateUserScore(userId) {
 
     for (const category of categories) {
         if (category.scores.length > 0) {
-            const count = Math.min(category.scores.length, category.max); // Cap at max
+            const count = Math.min(category.scores.length, category.max);
             const avg = category.isBool 
                 ? (category.scores.filter(s => s.correct).length / category.max) * 100 
                 : category.scores.reduce((sum, s) => sum + s.score, 0) / category.max;
             totalScore += avg;
-            totalWeight += 1; // Each category contributes equally when present
+            totalWeight += 1;
         }
     }
 
-    user.score = totalWeight > 0 ? Math.round(totalScore / 4) : 0; // Divide by total possible categories (4)
+    user.score = totalWeight > 0 ? Math.round(totalScore / 4) : 0;
     await user.save();
     console.log('Updated user score:', user.score);
 
-    // Fix missing titles in existing scores
+    // Fix missing titles
     for (let i = 0; i < user.homeworkScores.length; i++) {
         if (!user.homeworkScores[i].title || user.homeworkScores[i].title === 'Untitled Lesson') {
             const lesson = await Lesson.findById(user.homeworkScores[i].lessonId);
@@ -155,8 +142,7 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Login attempt:', { email });
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, using fallback login');
             req.session.userId = 'fallback-id';
             return res.status(200).send();
@@ -185,8 +171,7 @@ app.post('/api/signup', async (req, res) => {
     const { email, password, name } = req.body;
     console.log('Signup attempt:', { email });
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, signup failed');
             return res.status(500).json({ error: 'Database unavailable, signup failed' });
         }
@@ -214,8 +199,7 @@ app.get('/api/user-data', async (req, res) => {
         return res.status(401).send('Not logged in');
     }
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, using fallback data');
             return res.json({ 
                 name: 'Fallback User', 
@@ -223,7 +207,7 @@ app.get('/api/user-data', async (req, res) => {
                 achievements: [{ name: 'Pronunciation Pro', dateEarned: new Date() }] 
             });
         }
-        await updateUserScore(req.session.userId); // Ensure score and titles are up-to-date
+        await updateUserScore(req.session.userId);
         const user = await User.findById(req.session.userId);
         if (!user) {
             console.log('User not found:', req.session.userId);
@@ -251,19 +235,22 @@ app.get('/api/user-data', async (req, res) => {
 app.get('/lessons', async (req, res) => {
     console.log('Lessons request');
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, using sample lessons');
             return res.json([
                 { _id: '1', title: 'Sample Lesson 1', content: 'This is a sample lesson.', level: 'B1', createdAt: new Date() }
             ]);
         }
         const lessons = await Lesson.find().sort({ createdAt: -1 });
-        console.log('Lessons sent:', lessons);
+        if (!lessons || lessons.length === 0) {
+            console.log('No lessons found');
+            return res.status(404).json({ error: 'No lessons found' });
+        }
+        console.log('Lessons sent:', lessons.length);
         res.json(lessons);
     } catch (err) {
         console.error('Lessons error:', err.message);
-        res.status(404).json({ error: 'Lessons not found' });
+        res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
 });
 
@@ -271,19 +258,18 @@ app.get('/lessons', async (req, res) => {
 app.get('/references', async (req, res) => {
     console.log('References request');
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, using sample references');
             return res.json([
                 { _id: '1', title: 'Sample Reference', url: 'https://example.com', description: 'A sample resource' }
             ]);
         }
         const references = await Reference.find();
-        console.log('References sent:', references);
+        console.log('References sent:', references.length);
         res.json(references);
     } catch (err) {
         console.error('References error:', err.message);
-        res.status(404).json({ error: 'References not found' });
+        res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
 });
 
@@ -291,19 +277,18 @@ app.get('/references', async (req, res) => {
 app.get('/blogs', async (req, res) => {
     console.log('Blogs request');
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, using sample blogs');
             return res.json([
                 { _id: '1', title: 'Sample Blog', content: 'This is a sample blog post.', createdAt: new Date() }
             ]);
         }
         const blogs = await Blog.find().sort({ createdAt: -1 });
-        console.log('Blogs sent:', blogs);
+        console.log('Blogs sent:', blogs.length);
         res.json(blogs);
     } catch (err) {
         console.error('Blogs error:', err.message);
-        res.status(404).json({ error: 'Blogs not found' });
+        res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
 });
 
@@ -311,19 +296,22 @@ app.get('/blogs', async (req, res) => {
 app.get('/quizzes', async (req, res) => {
     console.log('Quizzes request');
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, using sample quizzes');
             return res.json([
                 { _id: '1', title: 'Sample Quiz', type: 'fill-in', questions: [{ prompt: 'What is 2+2?', correctAnswer: '4' }], timeLimit: 60, level: 'B1', createdAt: new Date() }
             ]);
         }
         const quizzes = await Quiz.find().sort({ createdAt: -1 });
-        console.log('Quizzes sent:', quizzes);
+        if (!quizzes || quizzes.length === 0) {
+            console.log('No quizzes found');
+            return res.status(404).json({ error: 'No quizzes found' });
+        }
+        console.log('Quizzes sent:', quizzes.length);
         res.json(quizzes);
     } catch (err) {
         console.error('Quizzes error:', err.message);
-        res.status(404).json({ error: 'Quizzes not found' });
+        res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
 });
 
@@ -331,17 +319,20 @@ app.get('/quizzes', async (req, res) => {
 app.get('/leaderboard', async (req, res) => {
     console.log('Leaderboard request');
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, using sample leaderboard');
             return res.json([{ name: 'Fallback User', score: 49 }]);
         }
         const users = await User.find({}, 'name score').sort({ score: -1 }).limit(10);
-        console.log('Leaderboard sent:', users);
+        if (!users || users.length === 0) {
+            console.log('No users found for leaderboard');
+            return res.status(404).json({ error: 'No users found' });
+        }
+        console.log('Leaderboard sent:', users.length);
         res.json(users);
     } catch (err) {
         console.error('Leaderboard error:', err.message);
-        res.status(404).json({ error: 'Leaderboard not found' });
+        res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
 });
 
@@ -354,8 +345,7 @@ app.post('/comprehension', async (req, res) => {
     }
     const { lessonId, answers } = req.body;
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, comprehension failed');
             return res.status(500).json({ error: 'Database unavailable' });
         }
@@ -400,8 +390,7 @@ app.post('/homework', async (req, res) => {
     }
     const { lessonId, answers } = req.body;
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, homework failed');
             return res.status(500).json({ error: 'Database unavailable' });
         }
@@ -446,8 +435,7 @@ app.post('/submit-quiz', async (req, res) => {
     }
     const { quizId, answers } = req.body;
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, quiz submission failed');
             return res.status(500).json({ error: 'Database unavailable' });
         }
@@ -492,8 +480,7 @@ app.post('/pronunciation', async (req, res) => {
     }
     const { lessonId, phrase, isCorrect } = req.body;
     try {
-        await connectToMongoDB();
-        if (!dbConnected) {
+        if (!mongoose.connection.readyState) {
             console.log('DB not connected, pronunciation failed');
             return res.status(500).json({ error: 'Database unavailable' });
         }
