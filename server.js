@@ -10,9 +10,7 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-const mongoURI = 'mongodb+srv://admin:securepassword123>@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password>
-
-// MongoDB Connection Status
+const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password> with your actual MongoDB Atlas password
 let dbConnected = false;
 async function connectToMongoDB() {
     try {
@@ -26,7 +24,6 @@ async function connectToMongoDB() {
 }
 connectToMongoDB();
 
-// Use in-memory session
 app.use(session({
     secret: 'your-secret-key',
     resave: false,
@@ -49,6 +46,15 @@ const UserSchema = new mongoose.Schema({
     admin: { type: Boolean, default: false }
 });
 const User = mongoose.model('User', UserSchema);
+
+// Lesson Schema (Simplified for Testing)
+const LessonSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    content: { type: String, required: true },
+    level: { type: String, enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], default: 'B1' },
+    createdAt: { type: Date, default: Date.now }
+});
+const Lesson = mongoose.model('Lesson', LessonSchema);
 
 // Login Endpoint
 app.post('/api/login', async (req, res) => {
@@ -114,7 +120,11 @@ app.get('/api/user-data', async (req, res) => {
     try {
         if (!dbConnected) {
             console.log('DB not connected, using fallback data');
-            return res.json({ name: 'Fallback User', score: 49, achievements: [{ name: 'Pronunciation Pro' }] });
+            return res.json({ 
+                name: 'Fallback User', 
+                score: 49, 
+                achievements: [{ name: 'Pronunciation Pro', dateEarned: new Date() }] 
+            });
         }
         const user = await User.findById(req.session.userId);
         if (!user) {
@@ -136,6 +146,42 @@ app.get('/api/user-data', async (req, res) => {
     } catch (err) {
         console.error('User data error:', err.message);
         res.status(500).json({ error: 'Server error - DB may be unavailable' });
+    }
+});
+
+// Lessons Endpoint
+app.get('/lessons', async (req, res) => {
+    console.log('Lessons request');
+    try {
+        if (!dbConnected) {
+            console.log('DB not connected, using sample lessons');
+            return res.json([
+                { _id: '1', title: 'Sample Lesson 1', content: 'This is a sample lesson.', level: 'B1', createdAt: new Date() }
+            ]);
+        }
+        const lessons = await Lesson.find().sort({ createdAt: -1 });
+        console.log('Lessons sent:', lessons);
+        res.json(lessons);
+    } catch (err) {
+        console.error('Lessons error:', err.message);
+        res.status(404).json({ error: 'Lessons not found' });
+    }
+});
+
+// Leaderboard Endpoint
+app.get('/leaderboard', async (req, res) => {
+    console.log('Leaderboard request');
+    try {
+        if (!dbConnected) {
+            console.log('DB not connected, using sample leaderboard');
+            return res.json([{ name: 'Fallback User', score: 49 }]);
+        }
+        const users = await User.find({}, 'name score').sort({ score: -1 }).limit(10);
+        console.log('Leaderboard sent:', users);
+        res.json(users);
+    } catch (err) {
+        console.error('Leaderboard error:', err.message);
+        res.status(404).json({ error: 'Leaderboard not found' });
     }
 });
 
