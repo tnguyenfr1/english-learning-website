@@ -10,7 +10,7 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password> with your actual MongoDB Atlas password
+const mongoURI = 'mongodb+srv://admin:<securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password>
 let dbConnected = false;
 async function connectToMongoDB() {
     try {
@@ -31,7 +31,7 @@ app.use(session({
     cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 day
 }));
 
-// User Schema
+// Schemas
 const UserSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -47,7 +47,6 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// Lesson Schema (Simplified for Testing)
 const LessonSchema = new mongoose.Schema({
     title: { type: String, required: true },
     content: { type: String, required: true },
@@ -55,6 +54,30 @@ const LessonSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 const Lesson = mongoose.model('Lesson', LessonSchema);
+
+const ReferenceSchema = new mongoose.Schema({
+    title: String,
+    url: String,
+    description: String
+});
+const Reference = mongoose.model('Reference', ReferenceSchema);
+
+const BlogSchema = new mongoose.Schema({
+    title: String,
+    content: String,
+    createdAt: { type: Date, default: Date.now }
+});
+const Blog = mongoose.model('Blog', BlogSchema);
+
+const QuizSchema = new mongoose.Schema({
+    title: String,
+    type: { type: String, enum: ['matching', 'fill-in'], required: true },
+    questions: [{ prompt: String, correctAnswer: String, options: [String] }],
+    timeLimit: Number,
+    level: { type: String, enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], default: 'B1' },
+    createdAt: { type: Date, default: Date.now }
+});
+const Quiz = mongoose.model('Quiz', QuizSchema);
 
 // Login Endpoint
 app.post('/api/login', async (req, res) => {
@@ -165,6 +188,63 @@ app.get('/lessons', async (req, res) => {
     } catch (err) {
         console.error('Lessons error:', err.message);
         res.status(404).json({ error: 'Lessons not found' });
+    }
+});
+
+// References Endpoint
+app.get('/references', async (req, res) => {
+    console.log('References request');
+    try {
+        if (!dbConnected) {
+            console.log('DB not connected, using sample references');
+            return res.json([
+                { _id: '1', title: 'Sample Reference', url: 'https://example.com', description: 'A sample resource' }
+            ]);
+        }
+        const references = await Reference.find();
+        console.log('References sent:', references);
+        res.json(references);
+    } catch (err) {
+        console.error('References error:', err.message);
+        res.status(404).json({ error: 'References not found' });
+    }
+});
+
+// Blogs Endpoint
+app.get('/blogs', async (req, res) => {
+    console.log('Blogs request');
+    try {
+        if (!dbConnected) {
+            console.log('DB not connected, using sample blogs');
+            return res.json([
+                { _id: '1', title: 'Sample Blog', content: 'This is a sample blog post.', createdAt: new Date() }
+            ]);
+        }
+        const blogs = await Blog.find().sort({ createdAt: -1 });
+        console.log('Blogs sent:', blogs);
+        res.json(blogs);
+    } catch (err) {
+        console.error('Blogs error:', err.message);
+        res.status(404).json({ error: 'Blogs not found' });
+    }
+});
+
+// Quizzes Endpoint
+app.get('/quizzes', async (req, res) => {
+    console.log('Quizzes request');
+    try {
+        if (!dbConnected) {
+            console.log('DB not connected, using sample quizzes');
+            return res.json([
+                { _id: '1', title: 'Sample Quiz', type: 'fill-in', questions: [{ prompt: 'What is 2+2?', correctAnswer: '4' }], timeLimit: 60, level: 'B1', createdAt: new Date() }
+            ]);
+        }
+        const quizzes = await Quiz.find().sort({ createdAt: -1 });
+        console.log('Quizzes sent:', quizzes);
+        res.json(quizzes);
+    } catch (err) {
+        console.error('Quizzes error:', err.message);
+        res.status(404).json({ error: 'Quizzes not found' });
     }
 });
 
