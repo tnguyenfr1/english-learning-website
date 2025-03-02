@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/?retryWrites=true&w=majority&appName=EnglishLearningCluster'
+const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password>
 const store = new MongoDBStore({
     uri: mongoURI,
     collection: 'sessions'
@@ -25,7 +25,7 @@ app.use(session({
 }));
 
 mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log('Connected to MongoDB Atlas'))
+    .then(() => console.log('Connected to MongoDB Atlas - english_learning'))
     .catch(err => console.error('MongoDB connection error, proceeding without DB:', err));
 
 // User Schema
@@ -103,13 +103,13 @@ app.get('/api/user-data', async (req, res) => {
         }
         const data = {
             name: user.name,
-            score: user.score || 49, // Fallback if DB fails
+            score: user.score || 0,
             homeworkScores: user.homeworkScores || [],
             pronunciationScores: user.pronunciationScores || [],
             comprehensionScores: user.comprehensionScores || [],
             quizScores: user.quizScores || [],
             referencesVisited: user.referencesVisited || [],
-            achievements: user.achievements || [{ name: 'Pronunciation Pro', dateEarned: new Date() }]
+            achievements: user.achievements || []
         };
         console.log('User data sent:', data);
         res.json(data);
