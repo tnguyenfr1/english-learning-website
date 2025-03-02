@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <div class="container login-container">
+    <div class="container signup-container">
         <h1>Sign Up</h1>
         <form id="signupForm">
             <div class="form-group">
@@ -23,22 +23,17 @@
             </div>
             <button type="submit">Sign Up</button>
         </form>
-        <p>Already registered? <a href="/index.html">Log in here</a></p>
+        <p>Already have an account? <a href="/index.html">Log in here</a></p>
     </div>
-    <script src="/script.js"></script>
     <script>
         document.getElementById('signupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const name = document.getElementById('name').value;
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                alert('Please enter a valid email address');
-                return;
-            }
+            console.log('Submitting signup:', { email });
             try {
-                const response = await fetch('/signup', {
+                const response = await fetch('/api/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password, name })
@@ -46,7 +41,7 @@
                 const responseText = await response.text();
                 console.log('Signup response:', { status: response.status, text: responseText });
                 if (!response.ok) throw new Error(`Signup failed: ${response.status} - ${responseText}`);
-                alert('Signup successful! Please log in.');
+                console.log('Signup successful, redirecting to login');
                 window.location.href = '/index.html';
             } catch (err) {
                 console.error('Signup fetch error:', err.message);
