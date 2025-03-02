@@ -102,7 +102,7 @@ app.get('/api/user-data', async (req, res) => {
             return res.status(404).send('User not found');
         }
         const data = {
-            name: user.name,
+            name: user.name || 'Unknown User',
             score: user.score || 0,
             homeworkScores: user.homeworkScores || [],
             pronunciationScores: user.pronunciationScores || [],
@@ -117,6 +117,19 @@ app.get('/api/user-data', async (req, res) => {
         console.error('User data error:', err);
         res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
+});
+
+// Logout Endpoint
+app.get('/api/logout', (req, res) => {
+    console.log('Logout attempt');
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Logout error:', err);
+            return res.status(500).json({ error: 'Logout failed' });
+        }
+        console.log('Logout successful');
+        res.redirect('/index.html');
+    });
 });
 
 app.listen(3000, () => console.log('Server running on http://localhost:3000'));
