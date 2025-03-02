@@ -94,43 +94,43 @@
     </div>
     <script src="/script.js"></script>
     <script>
-        const stripe = Stripe('pk_test_your_stripe_publishable_key');
+        const stripe = Stripe('pk_test_your_stripe_publishable_key'); // Replace with your Stripe publishable key
 
-    function updateProgressDetails(data) {
-        const homeworkCount = (data.homeworkScores || []).length;
-        const pronunciationCount = (data.pronunciationScores || []).filter(s => s.correct).length;
-        const comprehensionCount = (data.comprehensionScores || []).length;
-        const quizCount = (data.quizScores || []).length;
-        const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
-        const totalTasks = 12 * 3 + 2;
-        document.getElementById('score').textContent = `${data.score}%`;
-        document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
-        document.getElementById('progressBar').style.width = `${data.score}%`;
-        document.getElementById('progressDetails').innerHTML = `
-            Homework: ${homeworkCount}/12<br>
-            Comprehension: ${comprehensionCount}/12<br>
-            Pronunciation: ${pronunciationCount}/12<br>
-            Quizzes: ${quizCount}/2
-        `;
-        document.getElementById('progressTip').textContent = completedTasks < 20 ? 'Try more tasks to boost your score!' : 'Great progress—keep it up!';
-        document.getElementById('recommendation').textContent = data.recommendation;
-        const badgeImages = {
-    'Pronunciation Pro': '/images/pronunciation-pro.webp',
-    'Blog Explorer': '/images/blog-explorer.webp',
-    'Quiz Master': '/images/quiz-master.webp'
-};
-        document.getElementById('achievements').innerHTML = data.achievements.length > 0 
-            ? `<h3>Achievements</h3><ul class="badge-list">${data.achievements.map(a => `
-                <li><img src="${badgeImages[a.name]}" alt="${a.name}" class="badge-icon"> ${a.name} (Earned: ${new Date(a.dateEarned).toLocaleDateString()})</li>
-            `).join('')}</ul>`
-            : '<p>No achievements yet—keep learning!</p>';
-}
+        function updateProgressDetails(data) {
+            const homeworkCount = (data.homeworkScores || []).length;
+            const pronunciationCount = (data.pronunciationScores || []).filter(s => s.correct).length;
+            const comprehensionCount = (data.comprehensionScores || []).length;
+            const quizCount = (data.quizScores || []).length;
+            const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
+            const totalTasks = 12 * 3 + 2; // Adjust total tasks as needed
+            document.getElementById('score').textContent = `${data.score}%`;
+            document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
+            document.getElementById('progressBar').style.width = `${data.score}%`;
+            document.getElementById('progressDetails').innerHTML = `
+                Homework: ${homeworkCount}/12<br>
+                Comprehension: ${comprehensionCount}/12<br>
+                Pronunciation: ${pronunciationCount}/12<br>
+                Quizzes: ${quizCount}/2
+            `;
+            document.getElementById('progressTip').textContent = completedTasks < 20 ? 'Try more tasks to boost your score!' : 'Great progress—keep it up!';
+            document.getElementById('recommendation').textContent = data.recommendation || '';
+            const badgeImages = {
+                'Pronunciation Pro': '/images/pronunciation-pro.webp',
+                'Blog Explorer': '/images/blog-explorer.webp',
+                'Quiz Master': '/images/quiz-master.webp'
+            };
+            document.getElementById('achievements').innerHTML = data.achievements && data.achievements.length > 0 
+                ? `<h3>Achievements</h3><ul class="badge-list">${data.achievements.map(a => `
+                    <li><img src="${badgeImages[a.name]}" alt="${a.name}" class="badge-icon"> ${a.name} (Earned: ${new Date(a.dateEarned).toLocaleDateString()})</li>
+                `).join('')}</ul>`
+                : '<p>No achievements yet—keep learning!</p>';
+        }
 
-document.getElementById('logoutButton').addEventListener('click', () => {
-    fetch('/api/logout', { method: 'GET' }) // Changed from '/logout'
-        .then(response => { if (response.redirected) window.location.href = response.url; })
-        .catch(err => console.error('Logout error:', err));
-});
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            fetch('/api/logout', { method: 'GET' })
+                .then(response => { if (response.redirected) window.location.href = response.url; })
+                .catch(err => console.error('Logout error:', err));
+        });
 
         document.getElementById('donateButton').addEventListener('click', () => {
             fetch('/create-checkout-session', {
@@ -171,7 +171,7 @@ document.getElementById('logoutButton').addEventListener('click', () => {
             });
         });
 
-        fetch('/user-data')
+        fetch('/api/user-data') // Fixed from '/user-data'
             .then(res => {
                 if (!res.ok) {
                     if (res.status === 401) window.location.href = '/index.html';
@@ -181,115 +181,114 @@ document.getElementById('logoutButton').addEventListener('click', () => {
             })
             .then(data => {
                 console.log('User data received:', data);
-                document.getElementById('username').textContent = data.name;
+                document.getElementById('username').textContent = data.name || 'User';
                 document.getElementById('homeworkScores').innerHTML = data.homeworkScores && data.homeworkScores.length > 0 
-                    ? data.homeworkScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('')
+                    ? data.homeworkScores.map(s => `<li>${s.title || 'Lesson'}: ${s.score}%</li>`).join('')
                     : '<li>No homework submitted</li>';
                 document.getElementById('comprehensionScores').innerHTML = data.comprehensionScores && data.comprehensionScores.length > 0 
-                    ? data.comprehensionScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('')
+                    ? data.comprehensionScores.map(s => `<li>${s.title || 'Lesson'}: ${s.score}%</li>`).join('')
                     : '<li>No comprehension submitted</li>';
                 document.getElementById('pronunciationScores').innerHTML = data.pronunciationScores && data.pronunciationScores.length > 0 
                     ? data.pronunciationScores.map(s => `<li>${s.phrase}: ${s.correct ? 'Correct' : 'Incorrect'} (Attempts: ${s.attempts})</li>`).join('')
                     : '<li>No pronunciations attempted</li>';
                 document.getElementById('quizScores').innerHTML = data.quizScores && data.quizScores.length > 0 
-                    ? data.quizScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('')
+                    ? data.quizScores.map(s => `<li>${s.title || 'Quiz'}: ${s.score}%</li>`).join('')
                     : '<li>No quizzes completed</li>';
                 updateProgressDetails(data);
 
                 // Fetch lessons
                 let allLessons = [];
-                
                 fetch('/lessons')
-    .then(res => {
-        if (!res.ok) throw new Error(`Failed to fetch lessons: ${res.status}`);
-        return res.json();
-    })
-    .then(lessons => {
-        console.log('Lessons received:', lessons);
-        allLessons = lessons;
-        const lessonList = document.getElementById('lessonList');
-        const lessonJump = document.getElementById('lessonJump');
-        const levelFilter = document.getElementById('levelFilter');
+                    .then(res => {
+                        if (!res.ok) throw new Error(`Failed to fetch lessons: ${res.status}`);
+                        return res.json();
+                    })
+                    .then(lessons => {
+                        console.log('Lessons received:', lessons);
+                        allLessons = lessons;
+                        const lessonList = document.getElementById('lessonList');
+                        const lessonJump = document.getElementById('lessonJump');
+                        const levelFilter = document.getElementById('levelFilter');
 
-        function renderLessons(filterLevel) {
-            lessonList.innerHTML = `
-                ${allLessons.filter(lesson => !filterLevel || lesson.level === filterLevel).map(lesson => `
-                    <details class="lesson" id="lesson-${lesson._id}">
-                        <summary>${lesson.title} (${lesson.level})</summary>
-                        <div class="lesson-content">
-                            <h3>Reading Section</h3>
-                            <p>${lesson.content}</p>
-                            ${lesson.comprehension && lesson.comprehension.questions && lesson.comprehension.questions.length > 0 ? `
-                                <h4>Reading Comprehension</h4>
-                                <form class="comprehensionForm" data-lesson-id="${lesson._id}">
-                                    <div class="questions">
-                                        ${lesson.comprehension.questions.map((q, i) => `
-                                            <p>${q.question}</p>
-                                            <label><input type="radio" name="answer${i}" value="true" required> Yes/True</label>
-                                            <label><input type="radio" name="answer${i}" value="false"> No/False</label>
-                                        `).join('')}
-                                    </div>
-                                    <button type="submit">Submit Comprehension</button>
-                                </form>
-                            ` : ''}
-                            ${lesson.homework ? `
-                                <h4>Homework (${lesson.level})</h4>
-                                <form class="homeworkForm" data-lesson-id="${lesson._id}">
-                                    ${lesson.homework.map((q, i) => `
-                                        <p>${q.question}</p>
-                                        ${q.type === 'fill-in' ? `
-                                            <input type="text" name="answer${i}" placeholder="Your answer" required>
-                                        ` : `
-                                            <select name="answer${i}" required>
-                                                ${q.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
-                                            </select>
-                                        `}
-                                    `).join('')}
-                                    <button type="submit">Submit Homework</button>
-                                </form>
-                            ` : ''}
-                            ${lesson.pronunciation ? `
-                                <h4>Practice Pronunciation</h4>
-                                ${lesson.pronunciation.map((p, i) => `
-                                    <p>${p.phrase}</p>
-                                    <button class="recordButton" data-phrase="${p.phrase}" data-lesson-id="${lesson._id}" data-result-id="result-${lesson._id}-${i}">Record</button>
-                                    <span id="result-${lesson._id}-${i}"></span>
+                        function renderLessons(filterLevel) {
+                            lessonList.innerHTML = `
+                                ${allLessons.filter(lesson => !filterLevel || lesson.level === filterLevel).map(lesson => `
+                                    <details class="lesson" id="lesson-${lesson._id}">
+                                        <summary>${lesson.title} (${lesson.level})</summary>
+                                        <div class="lesson-content">
+                                            <h3>Reading Section</h3>
+                                            <p>${lesson.content}</p>
+                                            ${lesson.comprehension && lesson.comprehension.questions && lesson.comprehension.questions.length > 0 ? `
+                                                <h4>Reading Comprehension</h4>
+                                                <form class="comprehensionForm" data-lesson-id="${lesson._id}">
+                                                    <div class="questions">
+                                                        ${lesson.comprehension.questions.map((q, i) => `
+                                                            <p>${q.question}</p>
+                                                            <label><input type="radio" name="answer${i}" value="true" required> Yes/True</label>
+                                                            <label><input type="radio" name="answer${i}" value="false"> No/False</label>
+                                                        `).join('')}
+                                                    </div>
+                                                    <button type="submit">Submit Comprehension</button>
+                                                </form>
+                                            ` : ''}
+                                            ${lesson.homework ? `
+                                                <h4>Homework (${lesson.level})</h4>
+                                                <form class="homeworkForm" data-lesson-id="${lesson._id}">
+                                                    ${lesson.homework.map((q, i) => `
+                                                        <p>${q.question}</p>
+                                                        ${q.type === 'fill-in' ? `
+                                                            <input type="text" name="answer${i}" placeholder="Your answer" required>
+                                                        ` : `
+                                                            <select name="answer${i}" required>
+                                                                ${q.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                                                            </select>
+                                                        `}
+                                                    `).join('')}
+                                                    <button type="submit">Submit Homework</button>
+                                                </form>
+                                            ` : ''}
+                                            ${lesson.pronunciation ? `
+                                                <h4>Practice Pronunciation</h4>
+                                                ${lesson.pronunciation.map((p, i) => `
+                                                    <p>${p.phrase}</p>
+                                                    <button class="recordButton" data-phrase="${p.phrase}" data-lesson-id="${lesson._id}" data-result-id="result-${lesson._id}-${i}">Record</button>
+                                                    <span id="result-${lesson._id}-${i}"></span>
+                                                `).join('')}
+                                            ` : ''}
+                                        </div>
+                                    </details>
                                 `).join('')}
-                            ` : ''}
-                        </div>
-                    </details>
-                `).join('')}
-            `;
-        }
+                            `;
+                        }
 
-        renderLessons('');
-        lessons.forEach(lesson => {
-            const option = document.createElement('option');
-            option.value = `lesson-${lesson._id}`;
-            option.textContent = `${lesson.title} (${lesson.level})`;
-            lessonJump.appendChild(option);
-        });
-        lessonJump.addEventListener('change', (e) => {
-            const targetId = e.target.value;
-            const target = document.getElementById(targetId);
-            if (target) {
-                document.querySelectorAll('.content section').forEach(section => {
-                    section.classList.remove('active');
-                });
-                document.querySelectorAll('.toc a').forEach(a => {
-                    a.classList.remove('active');
-                });
-                document.getElementById('lessons').classList.add('active');
-                document.querySelector('.toc a[href="#lessons"]').classList.add('active');
-                target.scrollIntoView({ behavior: 'smooth' });
-                target.open = true;
-                document.getElementById('breadcrumb').textContent = `Dashboard > Lessons > ${target.querySelector('summary').textContent}`;
-            }
-            e.target.value = '';
-        });
-        levelFilter.addEventListener('change', (e) => {
-            renderLessons(e.target.value);
-        });
+                        renderLessons('');
+                        lessons.forEach(lesson => {
+                            const option = document.createElement('option');
+                            option.value = `lesson-${lesson._id}`;
+                            option.textContent = `${lesson.title} (${lesson.level})`;
+                            lessonJump.appendChild(option);
+                        });
+                        lessonJump.addEventListener('change', (e) => {
+                            const targetId = e.target.value;
+                            const target = document.getElementById(targetId);
+                            if (target) {
+                                document.querySelectorAll('.content section').forEach(section => {
+                                    section.classList.remove('active');
+                                });
+                                document.querySelectorAll('.toc a').forEach(a => {
+                                    a.classList.remove('active');
+                                });
+                                document.getElementById('lessons').classList.add('active');
+                                document.querySelector('.toc a[href="#lessons"]').classList.add('active');
+                                target.scrollIntoView({ behavior: 'smooth' });
+                                target.open = true;
+                                document.getElementById('breadcrumb').textContent = `Dashboard > Lessons > ${target.querySelector('summary').textContent}`;
+                            }
+                            e.target.value = '';
+                        });
+                        levelFilter.addEventListener('change', (e) => {
+                            renderLessons(e.target.value);
+                        });
 
                         // Fetch references
                         fetch('/references')
@@ -303,7 +302,7 @@ document.getElementById('logoutButton').addEventListener('click', () => {
                                 referenceList.innerHTML = references.length > 0 
                                     ? references.map(ref => `
                                         <li>
-                                            <input type="checkbox" class="refCheckbox" data-id="${ref._id}" ${data.referencesVisited.includes(ref._id) ? 'checked' : ''}>
+                                            <input type="checkbox" class="refCheckbox" data-id="${ref._id}" ${data.referencesVisited && data.referencesVisited.includes(ref._id) ? 'checked' : ''}>
                                             <a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}
                                         </li>
                                     `).join('')
@@ -318,7 +317,7 @@ document.getElementById('logoutButton').addEventListener('click', () => {
                                                 body: JSON.stringify({ referenceId: refId })
                                             });
                                             console.log('Marked reference visited:', refId);
-                                            fetch('/user-data').then(res => res.json()).then(updateData => {
+                                            fetch('/api/user-data').then(res => res.json()).then(updateData => {
                                                 updateProgressDetails(updateData);
                                             });
                                         }
@@ -441,8 +440,8 @@ document.getElementById('logoutButton').addEventListener('click', () => {
                                                     feedback += `${f.prompt}: ${f.correct ? 'Correct!' : `Wrong, answer: ${f.correctAnswer}`}\n`;
                                                 });
                                                 alert(feedback);
-                                                fetch('/user-data').then(res => res.json()).then(updateData => {
-                                                    document.getElementById('quizScores').innerHTML = updateData.quizScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('');
+                                                fetch('/api/user-data').then(res => res.json()).then(updateData => {
+                                                    document.getElementById('quizScores').innerHTML = updateData.quizScores.map(s => `<li>${s.title || 'Quiz'}: ${s.score}%</li>`).join('');
                                                     updateProgressDetails(updateData);
                                                 });
                                                 quizContent.style.display = 'none';
@@ -480,8 +479,8 @@ document.getElementById('logoutButton').addEventListener('click', () => {
                                         feedback += `${f.question}: ${f.correct ? 'Correct!' : `Wrong, try: ${f.correctAnswer}`}\n`;
                                     });
                                     alert(feedback);
-                                    fetch('/user-data').then(res => res.json()).then(updateData => {
-                                        document.getElementById('homeworkScores').innerHTML = updateData.homeworkScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('');
+                                    fetch('/api/user-data').then(res => res.json()).then(updateData => {
+                                        document.getElementById('homeworkScores').innerHTML = updateData.homeworkScores.map(s => `<li>${s.title || 'Lesson'}: ${s.score}%</li>`).join('');
                                         updateProgressDetails(updateData);
                                     });
                                 } catch (err) {
@@ -514,8 +513,8 @@ document.getElementById('logoutButton').addEventListener('click', () => {
                                         feedback += `${f.question}: ${f.correct ? 'Correct!' : `Wrong, answer: ${f.correctAnswer ? 'Yes/True' : 'No/False'}`}\n`;
                                     });
                                     alert(feedback);
-                                    fetch('/user-data').then(res => res.json()).then(updateData => {
-                                        document.getElementById('comprehensionScores').innerHTML = updateData.comprehensionScores.map(s => `<li>${s.title}: ${s.score}%</li>`).join('');
+                                    fetch('/api/user-data').then(res => res.json()).then(updateData => {
+                                        document.getElementById('comprehensionScores').innerHTML = updateData.comprehensionScores.map(s => `<li>${s.title || 'Lesson'}: ${s.score}%</li>`).join('');
                                         updateProgressDetails(updateData);
                                     });
                                 } catch (err) {
@@ -566,7 +565,7 @@ document.getElementById('logoutButton').addEventListener('click', () => {
                                     .then(({ ok, status, text }) => {
                                         if (!ok) throw new Error(`Pronunciation save failed: ${status} - ${text}`);
                                         console.log('Pronunciation saved successfully:', text);
-                                        fetch('/user-data').then(res => res.json()).then(updateData => {
+                                        fetch('/api/user-data').then(res => res.json()).then(updateData => {
                                             document.getElementById('pronunciationScores').innerHTML = updateData.pronunciationScores.map(s => `<li>${s.phrase}: ${s.correct ? 'Correct' : 'Incorrect'} (Attempts: ${s.attempts})</li>`).join('');
                                             updateProgressDetails(updateData);
                                         });
