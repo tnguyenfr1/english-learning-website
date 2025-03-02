@@ -50,8 +50,13 @@ app.post('/api/login', async (req, res) => {
     console.log('Login attempt:', { email });
     try {
         const user = await User.findOne({ email });
-        if (!user || !await bcrypt.compare(password, user.password)) {
-            console.log('Invalid credentials for:', email);
+        if (!user) {
+            console.log('User not found:', email);
+            return res.status(401).send('Invalid credentials');
+        }
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        if (!passwordMatch) {
+            console.log('Password mismatch for:', email);
             return res.status(401).send('Invalid credentials');
         }
         req.session.userId = user._id;
@@ -59,6 +64,27 @@ app.post('/api/login', async (req, res) => {
         res.status(200).send();
     } catch (err) {
         console.error('Login error:', err);
+        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+    }
+});
+
+// Signup Endpoint
+app.post('/api/signup', async (req, res) => {
+    const { email, password, name } = req.body;
+    console.log('Signup attempt:', { email });
+    try {
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            console.log('Email already in use:', email);
+            return res.status(400).send('Email already in use');
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = new User({ email, password: hashedPassword, name });
+        await user.save();
+        console.log('Signup successful:', email);
+        res.status(201).send();
+    } catch (err) {
+        console.error('Signup error:', err);
         res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
 });
