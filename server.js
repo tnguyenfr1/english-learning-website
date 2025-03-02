@@ -10,9 +10,9 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password>
+const mongoURI = 'mongodb+srv://admin:securepassword123>@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password>
 
-// Setup MongoDB connection asynchronously
+// MongoDB Connection Status
 let dbConnected = false;
 async function connectToMongoDB() {
     try {
@@ -20,13 +20,13 @@ async function connectToMongoDB() {
         console.log('Connected to MongoDB Atlas - english_learning');
         dbConnected = true;
     } catch (err) {
-        console.error('MongoDB connection error, proceeding without DB:', err);
+        console.error('MongoDB connection error:', err.message);
         dbConnected = false;
     }
 }
 connectToMongoDB();
 
-// Use in-memory session for now—remove MongoDBStore dependency
+// Use in-memory session
 app.use(session({
     secret: 'your-secret-key',
     resave: false,
@@ -57,7 +57,7 @@ app.post('/api/login', async (req, res) => {
     try {
         if (!dbConnected) {
             console.log('DB not connected, using fallback login');
-            req.session.userId = 'fallback-id'; // Temporary for testing
+            req.session.userId = 'fallback-id';
             return res.status(200).send();
         }
         const user = await User.findOne({ email });
@@ -74,7 +74,7 @@ app.post('/api/login', async (req, res) => {
         console.log('Login successful:', email, 'Session ID:', req.session.userId);
         res.status(200).send();
     } catch (err) {
-        console.error('Login error:', err);
+        console.error('Login error:', err.message);
         res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
 });
@@ -85,8 +85,8 @@ app.post('/api/signup', async (req, res) => {
     console.log('Signup attempt:', { email });
     try {
         if (!dbConnected) {
-            console.log('DB not connected, skipping signup');
-            return res.status(201).send(); // Temporary success
+            console.log('DB not connected, signup failed');
+            return res.status(500).json({ error: 'Database unavailable, signup failed' });
         }
         const existingUser = await User.findOne({ email });
         if (existingUser) {
@@ -99,8 +99,8 @@ app.post('/api/signup', async (req, res) => {
         console.log('Signup successful:', email);
         res.status(201).send();
     } catch (err) {
-        console.error('Signup error:', err);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        console.error('Signup error:', err.message);
+        res.status(500).json({ error: 'Server error - Signup failed: ' + err.message });
     }
 });
 
@@ -134,7 +134,7 @@ app.get('/api/user-data', async (req, res) => {
         console.log('User data sent:', data);
         res.json(data);
     } catch (err) {
-        console.error('User data error:', err);
+        console.error('User data error:', err.message);
         res.status(500).json({ error: 'Server error - DB may be unavailable' });
     }
 });
@@ -144,7 +144,7 @@ app.get('/api/logout', (req, res) => {
     console.log('Logout attempt, session:', req.session);
     req.session.destroy((err) => {
         if (err) {
-            console.error('Logout error:', err);
+            console.error('Logout error:', err.message);
             return res.status(500).json({ error: 'Logout failed' });
         }
         console.log('Logout successful');
