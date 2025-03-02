@@ -33,10 +33,10 @@
                 return;
             }
             try {
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                const response = await fetch('/api/login', { // Line ~21 in script.js or inline
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
                 });
                 const responseText = await response.text();
                 console.log('Login response:', { status: response.status, text: responseText });

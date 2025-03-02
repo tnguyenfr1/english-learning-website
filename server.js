@@ -115,33 +115,18 @@ async function checkAchievements(user) {
     }
 }
 
-app.post('/login', async (req, res) => {
+app.post('/api/login', async (req, res) => { // Change from '/login'
     const { email, password } = req.body;
-    console.log('Login attempt:', { email });
     try {
         const user = await User.findOne({ email });
-        if (!user) {
-            console.log('User not found:', email);
+        if (!user || !await bcrypt.compare(password, user.password)) {
             return res.status(401).send('Invalid credentials');
         }
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            console.log('Password mismatch for:', email);
-            return res.status(401).send('Invalid credentials');
-        }
-        if (!user.homeworkScores) user.homeworkScores = [];
-        if (!user.pronunciationScores) user.pronunciationScores = [];
-        if (!user.comprehensionScores) user.comprehensionScores = [];
-        if (!user.quizScores) user.quizScores = [];
-        if (!user.referencesVisited) user.referencesVisited = [];
-        if (!user.achievements) user.achievements = [];
-        await user.save();
         req.session.userId = user._id;
-        console.log('Login successful:', email, 'Session ID:', req.session.userId);
         res.status(200).send();
     } catch (err) {
-        console.error('Login error:', err.message, err.stack);
-        res.status(500).json({ error: `Server error: ${err.message}` });
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
