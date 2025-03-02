@@ -9,7 +9,9 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password>
+console.log('Server starting...');
+
+const mongoURI = 'mongodb+srv://admin:<securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password>
 const store = new MongoDBStore({
     uri: mongoURI,
     collection: 'sessions'
@@ -120,7 +122,7 @@ app.get('/api/user-data', async (req, res) => {
     }
 });
 
-// Logout Endpoint
+// Logout Endpoint - Already included in last version
 app.get('/api/logout', (req, res) => {
     console.log('Logout attempt, session:', req.session);
     req.session.destroy((err) => {
