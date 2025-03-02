@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
-const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey'); 
+const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey'); // Replace with your real key
 const app = express();
 
 app.use(express.json());
@@ -10,19 +10,16 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; 
+const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Replace <db_password> with your real password
 let dbConnected = false;
-async function connectToMongoDB() {
-    try {
-        await mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true });
+
+// Connect to MongoDB at startup
+mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => {
         console.log('Connected to MongoDB Atlas - english_learning');
         dbConnected = true;
-    } catch (err) {
-        console.error('MongoDB connection error:', err.message);
-        dbConnected = false;
-    }
-}
-connectToMongoDB();
+    })
+    .catch(err => console.error('MongoDB connection error:', err.message));
 
 app.use(session({
     secret: 'your-secret-key',
