@@ -7,7 +7,7 @@ if (window.location.pathname === '/index.html' || window.location.pathname === '
         console.log('Submitting login:', { email });
 
         try {
-            const response = await fetch('/login', {
+            const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -34,7 +34,7 @@ if (window.location.pathname === '/signup.html') {
         console.log('Submitting signup:', { email, name });
 
         try {
-            const response = await fetch('/signup', {
+            const response = await fetch('/api/signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password, name })

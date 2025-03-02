@@ -97,12 +97,12 @@
         const stripe = Stripe('pk_test_your_stripe_publishable_key'); // Replace with your Stripe publishable key
 
         function updateProgressDetails(data) {
-            const homeworkCount = (data.homeworkScores || []).length;
-            const pronunciationCount = (data.pronunciationScores || []).filter(s => s.correct).length;
-            const comprehensionCount = (data.comprehensionScores || []).length;
-            const quizCount = (data.quizScores || []).length;
+            const homeworkCount = Math.min((data.homeworkScores || []).length, 12);
+            const pronunciationCount = Math.min((data.pronunciationScores || []).filter(s => s.correct).length, 12);
+            const comprehensionCount = Math.min((data.comprehensionScores || []).length, 12);
+            const quizCount = Math.min((data.quizScores || []).length, 2);
             const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
-            const totalTasks = 12 * 3 + 2; // Adjust total tasks as needed
+            const totalTasks = 12 * 3 + 2; // 38 total tasks
             document.getElementById('score').textContent = `${data.score}%`;
             document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
             document.getElementById('progressBar').style.width = `${data.score}%`;
@@ -171,7 +171,7 @@
             });
         });
 
-        fetch('/api/user-data') // Fixed from '/user-data'
+        fetch('/api/user-data')
             .then(res => {
                 if (!res.ok) {
                     if (res.status === 401) window.location.href = '/index.html';
@@ -183,16 +183,16 @@
                 console.log('User data received:', data);
                 document.getElementById('username').textContent = data.name || 'User';
                 document.getElementById('homeworkScores').innerHTML = data.homeworkScores && data.homeworkScores.length > 0 
-                    ? data.homeworkScores.map(s => `<li>${s.title || 'Lesson'}: ${s.score}%</li>`).join('')
+                    ? data.homeworkScores.map(s => `<li>${s.title || 'Unknown Lesson'}: ${s.score}%</li>`).join('')
                     : '<li>No homework submitted</li>';
                 document.getElementById('comprehensionScores').innerHTML = data.comprehensionScores && data.comprehensionScores.length > 0 
-                    ? data.comprehensionScores.map(s => `<li>${s.title || 'Lesson'}: ${s.score}%</li>`).join('')
+                    ? data.comprehensionScores.map(s => `<li>${s.title || 'Unknown Lesson'}: ${s.score}%</li>`).join('')
                     : '<li>No comprehension submitted</li>';
                 document.getElementById('pronunciationScores').innerHTML = data.pronunciationScores && data.pronunciationScores.length > 0 
                     ? data.pronunciationScores.map(s => `<li>${s.phrase}: ${s.correct ? 'Correct' : 'Incorrect'} (Attempts: ${s.attempts})</li>`).join('')
                     : '<li>No pronunciations attempted</li>';
                 document.getElementById('quizScores').innerHTML = data.quizScores && data.quizScores.length > 0 
-                    ? data.quizScores.map(s => `<li>${s.title || 'Quiz'}: ${s.score}%</li>`).join('')
+                    ? data.quizScores.map(s => `<li>${s.title || 'Unknown Quiz'}: ${s.score}%</li>`).join('')
                     : '<li>No quizzes completed</li>';
                 updateProgressDetails(data);
 
@@ -441,7 +441,7 @@
                                                 });
                                                 alert(feedback);
                                                 fetch('/api/user-data').then(res => res.json()).then(updateData => {
-                                                    document.getElementById('quizScores').innerHTML = updateData.quizScores.map(s => `<li>${s.title || 'Quiz'}: ${s.score}%</li>`).join('');
+                                                    document.getElementById('quizScores').innerHTML = updateData.quizScores.map(s => `<li>${s.title || 'Unknown Quiz'}: ${s.score}%</li>`).join('');
                                                     updateProgressDetails(updateData);
                                                 });
                                                 quizContent.style.display = 'none';
@@ -480,7 +480,7 @@
                                     });
                                     alert(feedback);
                                     fetch('/api/user-data').then(res => res.json()).then(updateData => {
-                                        document.getElementById('homeworkScores').innerHTML = updateData.homeworkScores.map(s => `<li>${s.title || 'Lesson'}: ${s.score}%</li>`).join('');
+                                        document.getElementById('homeworkScores').innerHTML = updateData.homeworkScores.map(s => `<li>${s.title || 'Unknown Lesson'}: ${s.score}%</li>`).join('');
                                         updateProgressDetails(updateData);
                                     });
                                 } catch (err) {
@@ -514,7 +514,7 @@
                                     });
                                     alert(feedback);
                                     fetch('/api/user-data').then(res => res.json()).then(updateData => {
-                                        document.getElementById('comprehensionScores').innerHTML = updateData.comprehensionScores.map(s => `<li>${s.title || 'Lesson'}: ${s.score}%</li>`).join('');
+                                        document.getElementById('comprehensionScores').innerHTML = updateData.comprehensionScores.map(s => `<li>${s.title || 'Unknown Lesson'}: ${s.score}%</li>`).join('');
                                         updateProgressDetails(updateData);
                                     });
                                 } catch (err) {
@@ -529,6 +529,30 @@
                         recognition.interimResults = false;
                         recognition.maxAlternatives = 1;
                         let isRecognizing = false;
+
+                        function normalizeText(text) {
+                            return text.toLowerCase().trim()
+                                .replace(/’/g, "'")
+                                .replace(/isation/g, 'ization') // Normalize British to American spelling
+                                .replace(/[^a-z0-9']/g, ''); // Remove special chars except apostrophes
+                        }
+
+                        function levenshteinDistance(a, b) {
+                            const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+                            for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+                            for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+                            for (let j = 1; j <= b.length; j++) {
+                                for (let i = 1; i <= a.length; i++) {
+                                    const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+                                    matrix[j][i] = Math.min(
+                                        matrix[j][i - 1] + 1, // deletion
+                                        matrix[j - 1][i] + 1, // insertion
+                                        matrix[j - 1][i - 1] + indicator // substitution
+                                    );
+                                }
+                            }
+                            return matrix[b.length][a.length];
+                        }
 
                         document.querySelectorAll('.recordButton').forEach(button => {
                             button.addEventListener('click', () => {
@@ -548,10 +572,10 @@
                                 resultSpan.textContent = 'Listening...';
 
                                 recognition.onresult = (event) => {
-                                    const spokenText = event.results[0][0].transcript.replace(/’/g, "'").toLowerCase().trim();
-                                    const expectedText = phrase.replace(/’/g, "'").toLowerCase().trim();
+                                    const spokenText = normalizeText(event.results[0][0].transcript);
+                                    const expectedText = normalizeText(phrase);
                                     console.log('Heard:', spokenText, 'Expected:', expectedText);
-                                    const isCorrect = spokenText === expectedText;
+                                    const isCorrect = spokenText === expectedText || levenshteinDistance(spokenText, expectedText) <= 2; // Allow minor differences
                                     resultSpan.textContent = isCorrect ? 'Correct!' : `Try again: heard "${spokenText}"`;
                                     isRecognizing = false;
                                     button.disabled = false;
