@@ -126,11 +126,11 @@
             : '<p>No achievements yet—keep learning!</p>';
 }
 
-        document.getElementById('logoutButton').addEventListener('click', () => {
-            fetch('/logout', { method: 'GET' })
-                .then(response => { if (response.redirected) window.location.href = response.url; })
-                .catch(err => console.error('Logout error:', err));
-        });
+document.getElementById('logoutButton').addEventListener('click', () => {
+    fetch('/api/logout', { method: 'GET' }) // Changed from '/logout'
+        .then(response => { if (response.redirected) window.location.href = response.url; })
+        .catch(err => console.error('Logout error:', err));
+});
 
         document.getElementById('donateButton').addEventListener('click', () => {
             fetch('/create-checkout-session', {
