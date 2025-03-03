@@ -133,7 +133,7 @@
         });
 
         document.getElementById('donateButton').addEventListener('click', () => {
-            fetch('/create-checkout-session', { // Note: Missing /api/—fix if endpoint exists
+            fetch('/api/create-checkout-session', { // Note: Missing /api/—fix if endpoint exists
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             })
@@ -280,6 +280,7 @@
                         });
                         levelFilter.addEventListener('change', (e) => renderLessons(e.target.value));
 
+                        // Fetch references
                         fetch('/api/references')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
@@ -295,10 +296,26 @@
                                         </li>
                                     `).join('')
                                     : '<li>No references available</li>';
-                                // Note: /mark-reference-visited not implemented—remove or add endpoint
+                                document.querySelectorAll('.refCheckbox').forEach(checkbox => {
+                                    checkbox.addEventListener('change', async (e) => {
+                                        const refId = e.target.dataset.id;
+                                        if (e.target.checked) {
+                                            await fetch('/api/mark-reference-visited', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ referenceId: refId })
+                                            });
+                                            console.log('Marked reference visited:', refId);
+                                            fetch('/api/user-data').then(res => res.json()).then(updateData => {
+                                                updateProgressDetails(updateData);
+                                            });
+                                        }
+                                    });
+                                });
                             })
                             .catch(err => console.error('Error loading references:', err));
 
+                        // Fetch blogs
                         fetch('/api/blogs')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch blogs: ${res.status}`);
@@ -318,6 +335,7 @@
                             })
                             .catch(err => console.error('Error loading blogs:', err));
 
+                        // Fetch leaderboard
                         fetch('/api/leaderboard')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch leaderboard: ${res.status}`);
@@ -333,6 +351,7 @@
                             })
                             .catch(err => console.error('Error loading leaderboard:', err));
 
+                        // Fetch quizzes
                         fetch('/api/quizzes')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch quizzes: ${res.status}`);

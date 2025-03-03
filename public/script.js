@@ -78,7 +78,7 @@ if (window.location.pathname === '/add-lesson.html') {
         console.log('Submitting lesson:', { title, content, comprehension: { text: comprehensionText, questions: comprehensionQuestions }, homework, pronunciation });
 
         try {
-            const response = await fetch('/lessons', {
+            const response = await fetch('/api/lessons', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title, content, comprehension: { text: comprehensionText, questions: comprehensionQuestions }, homework, pronunciation })
