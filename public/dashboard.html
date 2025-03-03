@@ -6,13 +6,76 @@
     <link rel="stylesheet" href="/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Arial&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        /* Enhanced Lesson Styling */
+        .lesson {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 10px 0;
+            padding: 15px;
+            transition: box-shadow 0.3s;
+        }
+        .lesson:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .lesson summary {
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: pointer;
+            padding: 10px;
+            background: #ecf0f1;
+            border-radius: 5px;
+        }
+        .lesson-content {
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .lesson-content h3, .lesson-content h4 {
+            color: #2980b9;
+        }
+        .lesson-content form {
+            margin: 10px 0;
+        }
+        .lesson-content button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .lesson-content button:hover {
+            background: #2980b9;
+        }
+        /* Welcome Section */
+        #welcome {
+            background: linear-gradient(to right, #3498db, #2ecc71);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        #welcome h2 {
+            margin: 0 0 10px;
+            font-size: 28px;
+        }
+        #welcome p {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body>
     <div class="container dashboard-container">
         <aside class="sidebar">
             <h1>Welcome, <span id="username"></span>!</h1>
             <ul class="toc">
-                <li><a href="#progress" class="active">Your Progress</a></li>
+                <li><a href="#welcome" class="active">Hello and Welcome</a></li>
+                <li><a href="#progress">Your Progress</a></li>
                 <li><a href="#homework-scores">Homework Scores</a></li>
                 <li><a href="#comprehension-scores">Comprehension Scores</a></li>
                 <li><a href="#pronunciation-scores">Pronunciation Scores</a></li>
@@ -31,7 +94,12 @@
         </aside>
         <main class="content">
             <div class="breadcrumb" id="breadcrumb">Dashboard</div>
-            <section id="progress" class="active">
+            <section id="welcome" class="active">
+                <h2>Hello and Welcome!</h2>
+                <p>Hi, I’m Thuan, the creator of this English learning platform, built with my amazing friend! I started this project to help learners like you master English through interactive lessons, quizzes, and pronunciation practice.</p>
+                <p>Why? Because learning English opened doors for me, and I want to share that joy with the world. Together, we’ve crafted a space where you can grow, track your progress, and have fun—let’s make your English journey unforgettable!</p>
+            </section>
+            <section id="progress">
                 <h2>Your Progress</h2>
                 <p>Total Score: <span id="score">0%</span></p>
                 <div class="progress-container">
@@ -94,7 +162,7 @@
     </div>
     <script src="/script.js"></script>
     <script>
-        const stripe = Stripe('pk_test_your_stripe_publishable_key'); // Replace with your Stripe key
+        const stripe = Stripe('pk_test_your_stripe_publishable_key');
 
         function updateProgressDetails(data) {
             const homeworkCount = Math.min((data.homeworkScores || []).length, 12);
@@ -102,7 +170,7 @@
             const comprehensionCount = Math.min((data.comprehensionScores || []).length, 12);
             const quizCount = Math.min((data.quizScores || []).length, 2);
             const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
-            const totalTasks = 12 * 3 + 2; // 38 total tasks
+            const totalTasks = 12 * 3 + 2;
             document.getElementById('score').textContent = `${data.score}%`;
             document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
             document.getElementById('progressBar').style.width = `${data.score}%`;
@@ -133,7 +201,7 @@
         });
 
         document.getElementById('donateButton').addEventListener('click', () => {
-            fetch('/create-checkout-session', { // Note: Missing /api/—fix if endpoint exists
+            fetch('/create-checkout-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             })
@@ -295,7 +363,6 @@
                                         </li>
                                     `).join('')
                                     : '<li>No references available</li>';
-                                // Note: /mark-reference-visited not implemented—remove or add endpoint
                             })
                             .catch(err => console.error('Error loading references:', err));
 
