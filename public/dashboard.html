@@ -133,7 +133,7 @@
         });
 
         document.getElementById('donateButton').addEventListener('click', () => {
-            fetch('/create-checkout-session', {
+            fetch('/api/create-checkout-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             })
@@ -198,7 +198,7 @@
 
                 // Fetch lessons
                 let allLessons = [];
-                fetch('/lessons')
+                fetch('/api/lessons')
                     .then(res => {
                         if (!res.ok) throw new Error(`Failed to fetch lessons: ${res.status}`);
                         return res.json();
@@ -291,7 +291,7 @@
                         });
 
                         // Fetch references
-                        fetch('/references')
+                        fetch('/api/references')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
                                 return res.json();
@@ -311,7 +311,7 @@
                                     checkbox.addEventListener('change', async (e) => {
                                         const refId = e.target.dataset.id;
                                         if (e.target.checked) {
-                                            await fetch('/mark-reference-visited', {
+                                            await fetch('/api/mark-reference-visited', {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({ referenceId: refId })
@@ -327,7 +327,7 @@
                             .catch(err => console.error('Error loading references:', err));
 
                         // Fetch blogs
-                        fetch('/blogs')
+                        fetch('/api/blogs')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch blogs: ${res.status}`);
                                 return res.json();
@@ -348,7 +348,7 @@
                             .catch(err => console.error('Error loading blogs:', err));
 
                         // Fetch leaderboard
-                        fetch('/leaderboard')
+                        fetch('/api/leaderboard')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch leaderboard: ${res.status}`);
                                 return res.json();
@@ -365,7 +365,7 @@
                             .catch(err => console.error('Error loading leaderboard:', err));
 
                         // Fetch quizzes
-                        fetch('/quizzes')
+                        fetch('/api/quizzes')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch quizzes: ${res.status}`);
                                 return res.json();
@@ -424,7 +424,7 @@
                                             clearInterval(timer);
                                             const answers = Array.from(e.target.querySelectorAll('select, input')).map(input => input.value);
                                             try {
-                                                const response = await fetch('/submit-quiz', {
+                                                const response = await fetch('/api/submit-quiz', {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
                                                     body: JSON.stringify({ quizId, answers })
@@ -463,7 +463,7 @@
                                 const answers = Array.from(form.querySelectorAll('input, select')).map(input => input.value);
                                 console.log('Submitting homework:', { lessonId, answers });
                                 try {
-                                    const response = await fetch('/homework', {
+                                    const response = await fetch('/api/homework', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ lessonId, answers })
@@ -497,7 +497,7 @@
                                 const answers = Array.from(form.querySelectorAll('input:checked')).map(input => input.value === 'true');
                                 console.log('Submitting comprehension:', { lessonId, answers });
                                 try {
-                                    const response = await fetch('/comprehension', {
+                                    const response = await fetch('/api/comprehension', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ lessonId, answers })
@@ -580,7 +580,7 @@
                                     isRecognizing = false;
                                     button.disabled = false;
 
-                                    fetch('/pronunciation', {
+                                    fetch('/api/pronunciation', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ lessonId, phrase, isCorrect })
