@@ -6,10 +6,10 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "server.js" },
-    { "src": "/lessons", "dest": "server.js" },
-    { "src": "/quizzes", "dest": "server.js" },
-    { "src": "/blogs", "dest": "server.js" },
-    { "src": "/references", "dest": "server.js" },
+    { "src": "/lessons(.*)", "dest": "server.js" },
+    { "src": "/quizzes(.*)", "dest": "server.js" },
+    { "src": "/blogs(.*)", "dest": "server.js" },
+    { "src": "/references(.*)", "dest": "server.js" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }
