@@ -1,9 +1,9 @@
 const express = require('express');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const session = require('express-session');
-const MongoStore = require('connect-mongodb-session')(session); // Add this
+const MongoStore = require('connect-mongodb-session')(session);
 const bcrypt = require('bcrypt');
-const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey'); // Replace with your real key
+const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey');
 const app = express();
 
 app.use(express.json());
@@ -60,23 +60,20 @@ async function ensureDBConnection() {
     return db;
 }
 
-// Session store with MongoDB
 const store = new MongoStore({
     uri: mongoURI,
     databaseName: 'english_learning',
     collection: 'sessions'
 });
 
-store.on('error', (err) => {
-    console.error('Session store error:', err);
-});
+store.on('error', (err) => console.error('Session store error:', err));
 
 app.use(session({
     secret: 'your-secret-key',
     resave: false,
     saveUninitialized: false,
     store: store,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 day
+    cookie: { maxAge: 1000 * 60 * 60 * 24 }
 }));
 
 async function updateUserScore(userId, db) {
@@ -84,44 +81,30 @@ async function updateUserScore(userId, db) {
     const user = await users.findOne({ _id: new ObjectId(userId) });
     if (!user) return;
 
-    const categories = [
-        { scores: user.homeworkScores || [], max: 12 },
-        { scores: user.comprehensionScores || [], max: 12 },
-        { scores: user.quizScores || [], max: 2 },
-        { scores: user.pronunciationScores || [], max: 12, isBool: true }
-    ];
+    const totalTasks = 38; // 12 Homework + 12 Comprehension + 12 Pronunciation + 2 Quizzes
+    const completedTasks = 
+        Math.min(user.homeworkScores?.length || 0, 12) +
+        Math.min(user.comprehensionScores?.length || 0, 12) +
+        Math.min(user.pronunciationScores?.filter(s => s.correct).length || 0, 12) +
+        Math.min(user.quizScores?.length || 0, 2);
 
-    let totalScore = 0;
-    let totalWeight = 0;
+    const score = Math.round((completedTasks / totalTasks) * 100);
+    await users.updateOne({ _id: new ObjectId(userId) }, { $set: { score } });
+    console.log(`Updated user score: ${score}% (${completedTasks}/${totalTasks})`);
 
-    for (const category of categories) {
-        if (category.scores.length > 0) {
-            const count = Math.min(category.scores.length, category.max);
-            const avg = category.isBool 
-                ? (category.scores.filter(s => s.correct).length / category.max) * 100 
-                : category.scores.reduce((sum, s) => sum + s.score, 0) / category.max;
-            totalScore += avg;
-            totalWeight += 1;
-        }
-    }
-
-    user.score = totalWeight > 0 ? Math.round(totalScore / 4) : 0;
-    await users.updateOne({ _id: new ObjectId(userId) }, { $set: { score: user.score } });
-    console.log('Updated user score:', user.score);
-
-    for (let i = 0; i < user.homeworkScores.length; i++) {
+    for (let i = 0; i < (user.homeworkScores?.length || 0); i++) {
         if (!user.homeworkScores[i].title || user.homeworkScores[i].title === 'Untitled Lesson') {
             const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(user.homeworkScores[i].lessonId) });
             user.homeworkScores[i].title = lesson ? lesson.title : 'Unknown Lesson';
         }
     }
-    for (let i = 0; i < user.comprehensionScores.length; i++) {
+    for (let i = 0; i < (user.comprehensionScores?.length || 0); i++) {
         if (!user.comprehensionScores[i].title || user.comprehensionScores[i].title === 'Untitled Lesson') {
             const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(user.comprehensionScores[i].lessonId) });
             user.comprehensionScores[i].title = lesson ? lesson.title : 'Unknown Lesson';
         }
     }
-    for (let i = 0; i < user.quizScores.length; i++) {
+    for (let i = 0; i < (user.quizScores?.length || 0); i++) {
         if (!user.quizScores[i].title || user.quizScores[i].title === 'Untitled Quiz') {
             const quiz = await db.collection('quizzes').findOne({ _id: new ObjectId(user.quizScores[i].quizId) });
             user.quizScores[i].title = quiz ? quiz.title : 'Unknown Quiz';
@@ -129,9 +112,9 @@ async function updateUserScore(userId, db) {
     }
     await users.updateOne({ _id: new ObjectId(userId) }, { 
         $set: { 
-            homeworkScores: user.homeworkScores, 
-            comprehensionScores: user.comprehensionScores, 
-            quizScores: user.quizScores 
+            homeworkScores: user.homeworkScores || [], 
+            comprehensionScores: user.comprehensionScores || [], 
+            quizScores: user.quizScores || [] 
         } 
     });
     console.log('Updated titles for user scores');
