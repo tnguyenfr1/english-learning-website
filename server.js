@@ -10,7 +10,8 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Your password
+//const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Your password
+const mongoURI = process.env.MONGODB_URI;
 const clientOptions = {
     serverApi: {
         version: ServerApiVersion.v1,
