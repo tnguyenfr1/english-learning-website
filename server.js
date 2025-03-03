@@ -13,11 +13,7 @@ console.log('Server starting...');
 
 const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster';
 const clientOptions = {
-    serverApi: {
-        version: ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
-    },
+    serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
     maxPoolSize: 10
 };
 
@@ -40,7 +36,7 @@ async function initializeDB() {
 }
 
 async function ensureDBConnection() {
-    const maxRetries = 3;
+    const maxRetries = 5;
     let attempts = 0;
     while (!db && attempts < maxRetries) {
         attempts++;
@@ -54,7 +50,7 @@ async function ensureDBConnection() {
                 console.error('Max retries reached, proceeding with fallback');
                 return null;
             }
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
     return db;
@@ -81,14 +77,21 @@ async function updateUserScore(userId, db) {
     const user = await users.findOne({ _id: new ObjectId(userId) });
     if (!user) return;
 
-    const totalTasks = 38; // 12 Homework + 12 Comprehension + 12 Pronunciation + 2 Quizzes
-    const completedTasks = 
-        Math.min(user.homeworkScores?.length || 0, 12) +
-        Math.min(user.comprehensionScores?.length || 0, 12) +
-        Math.min(user.pronunciationScores?.filter(s => s.correct).length || 0, 12) +
-        Math.min(user.quizScores?.length || 0, 2);
+    const lessons = await db.collection('lessons').find().toArray();
+    const quizzes = await db.collection('quizzes').find().toArray();
+    const totalTasks = 
+        lessons.filter(l => l.homework).length + 
+        lessons.filter(l => l.comprehension?.questions).length + 
+        lessons.filter(l => l.pronunciation).length + 
+        quizzes.length;
 
-    const score = Math.round((completedTasks / totalTasks) * 100);
+    const completedTasks = 
+        (user.homeworkScores?.length || 0) +
+        (user.comprehensionScores?.length || 0) +
+        (user.pronunciationScores?.filter(s => s.correct).length || 0) +
+        (user.quizScores?.length || 0);
+
+    const score = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     await users.updateOne({ _id: new ObjectId(userId) }, { $set: { score } });
     console.log(`Updated user score: ${score}% (${completedTasks}/${totalTasks})`);
 
@@ -146,7 +149,7 @@ app.post('/api/login', async (req, res) => {
         res.status(200).send();
     } catch (err) {
         console.error('Login error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        res.status(500).json({ error: 'Server error - DB may be unavailable', details: err.message });
     }
 });
 
@@ -155,10 +158,7 @@ app.post('/api/signup', async (req, res) => {
     console.log('Signup attempt:', { email });
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, signup failed');
-            return res.status(500).json({ error: 'Database unavailable, signup failed' });
-        }
+        if (!db) return res.status(500).json({ error: 'Database unavailable, signup failed' });
         const users = db.collection('users');
         const existingUser = await users.findOne({ email });
         if (existingUser) {
@@ -167,17 +167,9 @@ app.post('/api/signup', async (req, res) => {
         }
         const hashedPassword = await bcrypt.hash(password, 10);
         const result = await users.insertOne({ 
-            email, 
-            password: hashedPassword, 
-            name, 
-            score: 0, 
-            homeworkScores: [], 
-            pronunciationScores: [], 
-            comprehensionScores: [], 
-            quizScores: [], 
-            referencesVisited: [], 
-            achievements: [], 
-            admin: false 
+            email, password: hashedPassword, name, score: 0, 
+            homeworkScores: [], pronunciationScores: [], comprehensionScores: [], quizScores: [], 
+            referencesVisited: [], achievements: [], admin: false 
         });
         console.log('Signup successful:', email, 'User ID:', result.insertedId);
         res.status(201).send();
@@ -195,15 +187,10 @@ app.get('/api/user-data', async (req, res) => {
     }
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, using fallback data');
-            return res.json({ 
-                name: 'Fallback User', 
-                score: 49, 
-                achievements: [{ name: 'Pronunciation Pro', dateEarned: new Date() }] 
-            });
-        }
+        if (!db) return res.json({ name: 'Fallback User', score: 49, achievements: [{ name: 'Pronunciation Pro', dateEarned: new Date() }] });
         const users = db.collection('users');
+        const lessons = await db.collection('lessons').find().toArray();
+        const quizzes = await db.collection('quizzes').find().toArray();
         await updateUserScore(req.session.userId, db);
         const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
         if (!user) {
@@ -218,7 +205,9 @@ app.get('/api/user-data', async (req, res) => {
             comprehensionScores: user.comprehensionScores || [],
             quizScores: user.quizScores || [],
             referencesVisited: user.referencesVisited || [],
-            achievements: user.achievements || []
+            achievements: user.achievements || [],
+            lessons: lessons.map(l => ({ homework: !!l.homework, comprehension: !!l.comprehension?.questions, pronunciation: !!l.pronunciation })),
+            quizzes: quizzes.map(q => ({ id: q._id }))
         };
         console.log('User data sent:', data);
         res.json(data);
@@ -232,12 +221,7 @@ app.get('/api/lessons', async (req, res) => {
     console.log('Lessons request');
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, using sample lessons');
-            return res.json([
-                { _id: '1', title: 'Sample Lesson 1', content: 'This is a sample lesson.', level: 'B1', createdAt: new Date() }
-            ]);
-        }
+        if (!db) return res.json([{ _id: '1', title: 'Sample Lesson 1', content: 'This is a sample lesson.', level: 'B1', createdAt: new Date() }]);
         const lessons = await db.collection('lessons').find().sort({ createdAt: -1 }).toArray();
         console.log('Lessons sent:', lessons.length);
         res.json(lessons);
@@ -251,12 +235,7 @@ app.get('/api/references', async (req, res) => {
     console.log('References request');
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, using sample references');
-            return res.json([
-                { _id: '1', title: 'Sample Reference', url: 'https://example.com', description: 'A sample resource' }
-            ]);
-        }
+        if (!db) return res.json([{ _id: '1', title: 'Sample Reference', url: 'https://example.com', description: 'A sample resource' }]);
         const references = await db.collection('references').find().toArray();
         console.log('References sent:', references.length);
         res.json(references);
@@ -270,12 +249,7 @@ app.get('/api/blogs', async (req, res) => {
     console.log('Blogs request');
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, using sample blogs');
-            return res.json([
-                { _id: '1', title: 'Sample Blog', content: 'This is a sample blog post.', createdAt: new Date() }
-            ]);
-        }
+        if (!db) return res.json([{ _id: '1', title: 'Sample Blog', content: 'This is a sample blog post.', createdAt: new Date() }]);
         const blogs = await db.collection('blogs').find().sort({ createdAt: -1 }).toArray();
         console.log('Blogs sent:', blogs.length);
         res.json(blogs);
@@ -289,12 +263,7 @@ app.get('/api/quizzes', async (req, res) => {
     console.log('Quizzes request');
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, using sample quizzes');
-            return res.json([
-                { _id: '1', title: 'Sample Quiz', type: 'fill-in', questions: [{ prompt: 'What is 2+2?', correctAnswer: '4' }], timeLimit: 60, level: 'B1', createdAt: new Date() }
-            ]);
-        }
+        if (!db) return res.json([{ _id: '1', title: 'Sample Quiz', type: 'fill-in', questions: [{ prompt: 'What is 2+2?', correctAnswer: '4' }], timeLimit: 60, level: 'B1', createdAt: new Date() }]);
         const quizzes = await db.collection('quizzes').find().sort({ createdAt: -1 }).toArray();
         console.log('Quizzes sent:', quizzes.length);
         res.json(quizzes);
@@ -308,13 +277,18 @@ app.get('/api/leaderboard', async (req, res) => {
     console.log('Leaderboard request');
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, using sample leaderboard');
-            return res.json([{ name: 'Fallback User', score: 49 }]);
+        if (!db) return res.json([{ name: 'Fallback User', score: 49 }]);
+        const users = await db.collection('users').find().toArray();
+        for (const user of users) {
+            await updateUserScore(user._id.toString(), db);
         }
-        const users = await db.collection('users').find({}, { projection: { name: 1, score: 1 } }).sort({ score: -1 }).limit(10).toArray();
-        console.log('Leaderboard sent:', users.length);
-        res.json(users);
+        const leaderboard = await db.collection('users')
+            .find({}, { projection: { name: 1, score: 1 } })
+            .sort({ score: -1 })
+            .limit(10)
+            .toArray();
+        console.log('Leaderboard sent:', leaderboard);
+        res.json(leaderboard);
     } catch (err) {
         console.error('Leaderboard error:', err.message);
         res.status(500).json({ error: 'Server error - DB may be unavailable' });
@@ -330,10 +304,7 @@ app.post('/api/comprehension', async (req, res) => {
     const { lessonId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, comprehension failed');
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
         const lessons = db.collection('lessons');
         const lesson = await lessons.findOne({ _id: new ObjectId(lessonId) });
         if (!lesson || !lesson.comprehension || !lesson.comprehension.questions) {
@@ -377,10 +348,7 @@ app.post('/api/homework', async (req, res) => {
     const { lessonId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, homework failed');
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
         const lessons = db.collection('lessons');
         const lesson = await lessons.findOne({ _id: new ObjectId(lessonId) });
         if (!lesson || !lesson.homework || lesson.homework.length === 0) {
@@ -424,10 +392,7 @@ app.post('/api/submit-quiz', async (req, res) => {
     const { quizId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, quiz submission failed');
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
         const quizzes = db.collection('quizzes');
         const quiz = await quizzes.findOne({ _id: new ObjectId(quizId) });
         if (!quiz || !quiz.questions) {
@@ -471,10 +436,7 @@ app.post('/api/pronunciation', async (req, res) => {
     const { lessonId, phrase, isCorrect } = req.body;
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, pronunciation failed');
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
         const lessons = db.collection('lessons');
         const lesson = await lessons.findOne({ _id: new ObjectId(lessonId) });
         if (!lesson || !lesson.pronunciation || !lesson.pronunciation.some(p => p.phrase === phrase)) {

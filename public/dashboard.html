@@ -221,34 +221,40 @@
         const stripe = Stripe('pk_test_your_stripe_publishable_key');
 
         function updateProgressDetails(data) {
-            const homeworkCount = Math.min((data.homeworkScores || []).length, 12);
-            const pronunciationCount = Math.min((data.pronunciationScores || []).filter(s => s.correct).length, 12);
-            const comprehensionCount = Math.min((data.comprehensionScores || []).length, 12);
-            const quizCount = Math.min((data.quizScores || []).length, 2);
-            const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
-            const totalTasks = 12 * 3 + 2;
-            document.getElementById('score').textContent = `${data.score}%`;
-            document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
-            document.getElementById('progressBar').style.width = `${data.score}%`;
-            document.getElementById('progressDetails').innerHTML = `
-                Homework: ${homeworkCount}/12<br>
-                Comprehension: ${comprehensionCount}/12<br>
-                Pronunciation: ${pronunciationCount}/12<br>
-                Quizzes: ${quizCount}/2
-            `;
-            document.getElementById('progressTip').textContent = completedTasks < 20 ? 'Try more tasks to boost your score!' : 'Great progress—keep it up!';
-            document.getElementById('recommendation').textContent = data.recommendation || '';
-            const badgeImages = {
-                'Pronunciation Pro': '/images/pronunciation-pro.webp',
-                'Blog Explorer': '/images/blog-explorer.webp',
-                'Quiz Master': '/images/quiz-master.webp'
-            };
-            document.getElementById('achievements').innerHTML = data.achievements && data.achievements.length > 0 
-                ? `<h3>Achievements</h3><ul class="badge-list">${data.achievements.map(a => `
-                    <li><img src="${badgeImages[a.name]}" alt="${a.name}" class="badge-icon"> ${a.name} (Earned: ${new Date(a.dateEarned).toLocaleDateString()})</li>
-                `).join('')}</ul>`
-                : '<p>No achievements yet—keep learning!</p>';
-        }
+        const totalTasks = 
+            data.lessons.filter(l => l.homework).length + 
+            data.lessons.filter(l => l.comprehension).length + 
+            data.lessons.filter(l => l.pronunciation).length + 
+            data.quizzes.length;
+
+        const homeworkCount = (data.homeworkScores || []).length;
+        const pronunciationCount = (data.pronunciationScores || []).filter(s => s.correct).length;
+        const comprehensionCount = (data.comprehensionScores || []).length;
+        const quizCount = (data.quizScores || []).length;
+        const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
+
+        document.getElementById('score').textContent = `${data.score}%`;
+        document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
+        document.getElementById('progressBar').style.width = `${data.score}%`;
+        document.getElementById('progressDetails').innerHTML = `
+            Homework: ${homeworkCount}/${data.lessons.filter(l => l.homework).length}<br>
+            Comprehension: ${comprehensionCount}/${data.lessons.filter(l => l.comprehension).length}<br>
+            Pronunciation: ${pronunciationCount}/${data.lessons.filter(l => l.pronunciation).length}<br>
+            Quizzes: ${quizCount}/${data.quizzes.length}
+        `;
+        document.getElementById('progressTip').textContent = completedTasks < 20 ? 'Try more tasks to boost your score!' : 'Great progress—keep it up!';
+        document.getElementById('recommendation').textContent = data.recommendation || '';
+        const badgeImages = {
+            'Pronunciation Pro': '/images/pronunciation-pro.webp',
+            'Blog Explorer': '/images/blog-explorer.webp',
+            'Quiz Master': '/images/quiz-master.webp'
+        };
+        document.getElementById('achievements').innerHTML = data.achievements && data.achievements.length > 0 
+            ? `<h3>Achievements</h3><ul class="badge-list">${data.achievements.map(a => `
+                <li><img src="${badgeImages[a.name]}" alt="${a.name}" class="badge-icon"> ${a.name} (Earned: ${new Date(a.dateEarned).toLocaleDateString()})</li>
+            `).join('')}</ul>`
+            : '<p>No achievements yet—keep learning!</p>';
+    }
 
         document.getElementById('logoutButton').addEventListener('click', () => {
             fetch('/api/logout', { method: 'GET' })
