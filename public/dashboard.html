@@ -7,34 +7,58 @@
     <link href="https://fonts.googleapis.com/css2?family=Arial&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://js.stripe.com/v3/"></script>
     <style>
-        /* Enhanced Lesson Styling */
+        /* Welcome Section */
+        #welcome {
+            background: #fff;
+            color: #333;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        #welcome h2 {
+            margin: 0 0 15px;
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        #welcome p {
+            margin: 0 0 10px;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        /* Lessons Listing */
         .lesson {
-            background: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 8px;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
             margin: 10px 0;
             padding: 15px;
-            transition: box-shadow 0.3s;
+            transition: background 0.3s;
         }
         .lesson:hover {
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background: #f5f5f5;
         }
         .lesson summary {
-            font-weight: bold;
+            font-weight: normal;
             color: #2c3e50;
             cursor: pointer;
-            padding: 10px;
-            background: #ecf0f1;
-            border-radius: 5px;
+            padding: 0;
+            background: none;
+            list-style: none;
+        }
+        .lesson summary::-webkit-details-marker {
+            display: none;
+        }
+        .lesson summary::marker {
+            display: none;
         }
         .lesson-content {
-            padding: 15px;
-            background: white;
-            border-radius: 5px;
+            padding: 15px 0 0;
             margin-top: 10px;
         }
         .lesson-content h3, .lesson-content h4 {
             color: #2980b9;
+            margin: 10px 0;
         }
         .lesson-content form {
             margin: 10px 0;
@@ -50,22 +74,54 @@
         .lesson-content button:hover {
             background: #2980b9;
         }
-        /* Welcome Section */
-        #welcome {
-            background: linear-gradient(to right, #3498db, #2ecc71);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            text-align: center;
+        /* Progress Section */
+        .progress-container {
+            background: #e0e0e0;
+            border-radius: 5px;
+            height: 20px;
+            overflow: hidden;
         }
-        #welcome h2 {
-            margin: 0 0 10px;
-            font-size: 28px;
+        .progress-bar {
+            background: #27ae60; /* Vibrant green */
+            height: 100%;
+            transition: width 0.3s;
         }
-        #welcome p {
-            margin: 5px 0;
-            font-size: 16px;
+        #progressTip {
+            color: #27ae60; /* Matches progress bar */
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        #achievements {
+            color: #7f8c8d; /* Subtle gray */
+        }
+        /* Reference Listing */
+        .reference-list li {
+            list-style: none; /* No bullets */
+            margin: 10px 0;
+            padding: 5px 0;
+        }
+        .refCheckbox {
+            margin-right: 10px;
+        }
+        /* Blog Listing */
+        .blog-post {
+            border-bottom: 1px solid #e0e0e0;
+            margin: 10px 0;
+            padding: 15px 0;
+        }
+        .blog-post summary {
+            font-weight: normal;
+            color: #2c3e50;
+            cursor: pointer;
+            padding: 0;
+            background: none;
+            list-style: none;
+        }
+        .blog-post summary::-webkit-details-marker {
+            display: none;
+        }
+        .blog-post summary::marker {
+            display: none;
         }
     </style>
 </head>
