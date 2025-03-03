@@ -241,7 +241,7 @@ app.get('/api/user-data', async (req, res) => {
 });
 
 // Lessons Endpoint
-app.get('/lessons', async (req, res) => {
+app.get('/api/lessons', async (req, res) => {
     console.log('Lessons request');
     try {
         const db = await ensureDBConnection();
@@ -265,7 +265,7 @@ app.get('/lessons', async (req, res) => {
 });
 
 // References Endpoint
-app.get('/references', async (req, res) => {
+app.get('/api/references', async (req, res) => {
     console.log('References request');
     try {
         const db = await ensureDBConnection();
@@ -285,7 +285,7 @@ app.get('/references', async (req, res) => {
 });
 
 // Blogs Endpoint
-app.get('/blogs', async (req, res) => {
+app.get('/api/blogs', async (req, res) => {
     console.log('Blogs request');
     try {
         const db = await ensureDBConnection();
@@ -305,7 +305,7 @@ app.get('/blogs', async (req, res) => {
 });
 
 // Quizzes Endpoint
-app.get('/quizzes', async (req, res) => {
+app.get('/api/quizzes', async (req, res) => {
     console.log('Quizzes request');
     try {
         const db = await ensureDBConnection();
@@ -329,7 +329,7 @@ app.get('/quizzes', async (req, res) => {
 });
 
 // Leaderboard Endpoint
-app.get('/leaderboard', async (req, res) => {
+app.get('/api/leaderboard', async (req, res) => {
     console.log('Leaderboard request');
     try {
         const db = await ensureDBConnection();
@@ -351,7 +351,7 @@ app.get('/leaderboard', async (req, res) => {
 });
 
 // Comprehension Endpoint
-app.post('/comprehension', async (req, res) => {
+app.post('/api/comprehension', async (req, res) => {
     console.log('Comprehension request:', req.body);
     if (!req.session.userId) {
         console.log('No session userId');
@@ -399,7 +399,7 @@ app.post('/comprehension', async (req, res) => {
 });
 
 // Homework Endpoint
-app.post('/homework', async (req, res) => {
+app.post('/api/homework', async (req, res) => {
     console.log('Homework request:', req.body);
     if (!req.session.userId) {
         console.log('No session userId');
@@ -447,7 +447,7 @@ app.post('/homework', async (req, res) => {
 });
 
 // Quiz Submission Endpoint
-app.post('/submit-quiz', async (req, res) => {
+app.post('/api/submit-quiz', async (req, res) => {
     console.log('Quiz submission request:', req.body);
     if (!req.session.userId) {
         console.log('No session userId');
@@ -495,7 +495,7 @@ app.post('/submit-quiz', async (req, res) => {
 });
 
 // Pronunciation Endpoint
-app.post('/pronunciation', async (req, res) => {
+app.post('/api/pronunciation', async (req, res) => {
     console.log('Pronunciation request:', req.body);
     if (!req.session.userId) {
         console.log('No session userId');
