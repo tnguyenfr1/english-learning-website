@@ -1,6 +1,7 @@
 const express = require('express');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const session = require('express-session');
+const MongoStore = require('connect-mongodb-session')(session); // Add this
 const bcrypt = require('bcrypt');
 const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey'); // Replace with your real key
 const app = express();
@@ -10,20 +11,19 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-const mongoURI = 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster'; // Your password
+const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster';
 const clientOptions = {
     serverApi: {
         version: ServerApiVersion.v1,
         strict: true,
         deprecationErrors: true,
     },
-    maxPoolSize: 10 // Connection pooling
+    maxPoolSize: 10
 };
 
 let client;
 let db;
 
-// Initialize MongoDB connection
 async function initializeDB() {
     if (!client) {
         client = new MongoClient(mongoURI, clientOptions);
@@ -39,7 +39,6 @@ async function initializeDB() {
     return db;
 }
 
-// Ensure DB connection with retry
 async function ensureDBConnection() {
     const maxRetries = 3;
     let attempts = 0;
@@ -55,20 +54,31 @@ async function ensureDBConnection() {
                 console.error('Max retries reached, proceeding with fallback');
                 return null;
             }
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
     return db;
 }
 
+// Session store with MongoDB
+const store = new MongoStore({
+    uri: mongoURI,
+    databaseName: 'english_learning',
+    collection: 'sessions'
+});
+
+store.on('error', (err) => {
+    console.error('Session store error:', err);
+});
+
 app.use(session({
     secret: 'your-secret-key',
     resave: false,
     saveUninitialized: false,
+    store: store,
     cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 day
 }));
 
-// Update User Score Function
 async function updateUserScore(userId, db) {
     const users = db.collection('users');
     const user = await users.findOne({ _id: new ObjectId(userId) });
@@ -99,7 +109,6 @@ async function updateUserScore(userId, db) {
     await users.updateOne({ _id: new ObjectId(userId) }, { $set: { score: user.score } });
     console.log('Updated user score:', user.score);
 
-    // Fix missing titles
     for (let i = 0; i < user.homeworkScores.length; i++) {
         if (!user.homeworkScores[i].title || user.homeworkScores[i].title === 'Untitled Lesson') {
             const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(user.homeworkScores[i].lessonId) });
@@ -128,7 +137,6 @@ async function updateUserScore(userId, db) {
     console.log('Updated titles for user scores');
 }
 
-// Login Endpoint
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Login attempt:', { email });
@@ -159,7 +167,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Signup Endpoint
 app.post('/api/signup', async (req, res) => {
     const { email, password, name } = req.body;
     console.log('Signup attempt:', { email });
@@ -197,7 +204,6 @@ app.post('/api/signup', async (req, res) => {
     }
 });
 
-// User Data Endpoint
 app.get('/api/user-data', async (req, res) => {
     console.log('User data request, session:', req.session);
     if (!req.session.userId) {
@@ -239,8 +245,7 @@ app.get('/api/user-data', async (req, res) => {
     }
 });
 
-// Lessons Endpoint
-app.get('/lessons', async (req, res) => {
+app.get('/api/lessons', async (req, res) => {
     console.log('Lessons request');
     try {
         const db = await ensureDBConnection();
@@ -251,10 +256,6 @@ app.get('/lessons', async (req, res) => {
             ]);
         }
         const lessons = await db.collection('lessons').find().sort({ createdAt: -1 }).toArray();
-        if (!lessons || lessons.length === 0) {
-            console.log('No lessons found');
-            return res.status(404).json({ error: 'No lessons found' });
-        }
         console.log('Lessons sent:', lessons.length);
         res.json(lessons);
     } catch (err) {
@@ -263,8 +264,7 @@ app.get('/lessons', async (req, res) => {
     }
 });
 
-// References Endpoint
-app.get('/references', async (req, res) => {
+app.get('/api/references', async (req, res) => {
     console.log('References request');
     try {
         const db = await ensureDBConnection();
@@ -283,8 +283,7 @@ app.get('/references', async (req, res) => {
     }
 });
 
-// Blogs Endpoint
-app.get('/blogs', async (req, res) => {
+app.get('/api/blogs', async (req, res) => {
     console.log('Blogs request');
     try {
         const db = await ensureDBConnection();
@@ -303,8 +302,7 @@ app.get('/blogs', async (req, res) => {
     }
 });
 
-// Quizzes Endpoint
-app.get('/quizzes', async (req, res) => {
+app.get('/api/quizzes', async (req, res) => {
     console.log('Quizzes request');
     try {
         const db = await ensureDBConnection();
@@ -315,10 +313,6 @@ app.get('/quizzes', async (req, res) => {
             ]);
         }
         const quizzes = await db.collection('quizzes').find().sort({ createdAt: -1 }).toArray();
-        if (!quizzes || quizzes.length === 0) {
-            console.log('No quizzes found');
-            return res.status(404).json({ error: 'No quizzes found' });
-        }
         console.log('Quizzes sent:', quizzes.length);
         res.json(quizzes);
     } catch (err) {
@@ -327,8 +321,7 @@ app.get('/quizzes', async (req, res) => {
     }
 });
 
-// Leaderboard Endpoint
-app.get('/leaderboard', async (req, res) => {
+app.get('/api/leaderboard', async (req, res) => {
     console.log('Leaderboard request');
     try {
         const db = await ensureDBConnection();
@@ -337,10 +330,6 @@ app.get('/leaderboard', async (req, res) => {
             return res.json([{ name: 'Fallback User', score: 49 }]);
         }
         const users = await db.collection('users').find({}, { projection: { name: 1, score: 1 } }).sort({ score: -1 }).limit(10).toArray();
-        if (!users || users.length === 0) {
-            console.log('No users found for leaderboard');
-            return res.status(404).json({ error: 'No users found' });
-        }
         console.log('Leaderboard sent:', users.length);
         res.json(users);
     } catch (err) {
@@ -349,8 +338,7 @@ app.get('/leaderboard', async (req, res) => {
     }
 });
 
-// Comprehension Endpoint
-app.post('/comprehension', async (req, res) => {
+app.post('/api/comprehension', async (req, res) => {
     console.log('Comprehension request:', req.body);
     if (!req.session.userId) {
         console.log('No session userId');
@@ -397,8 +385,7 @@ app.post('/comprehension', async (req, res) => {
     }
 });
 
-// Homework Endpoint
-app.post('/homework', async (req, res) => {
+app.post('/api/homework', async (req, res) => {
     console.log('Homework request:', req.body);
     if (!req.session.userId) {
         console.log('No session userId');
@@ -445,8 +432,7 @@ app.post('/homework', async (req, res) => {
     }
 });
 
-// Quiz Submission Endpoint
-app.post('/submit-quiz', async (req, res) => {
+app.post('/api/submit-quiz', async (req, res) => {
     console.log('Quiz submission request:', req.body);
     if (!req.session.userId) {
         console.log('No session userId');
@@ -493,8 +479,7 @@ app.post('/submit-quiz', async (req, res) => {
     }
 });
 
-// Pronunciation Endpoint
-app.post('/pronunciation', async (req, res) => {
+app.post('/api/pronunciation', async (req, res) => {
     console.log('Pronunciation request:', req.body);
     if (!req.session.userId) {
         console.log('No session userId');
@@ -533,7 +518,6 @@ app.post('/pronunciation', async (req, res) => {
     }
 });
 
-// Logout Endpoint
 app.get('/api/logout', (req, res) => {
     console.log('Logout attempt, session:', req.session);
     req.session.destroy((err) => {

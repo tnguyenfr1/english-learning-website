@@ -94,7 +94,7 @@
     </div>
     <script src="/script.js"></script>
     <script>
-        const stripe = Stripe('pk_test_your_stripe_publishable_key'); // Replace with your Stripe publishable key
+        const stripe = Stripe('pk_test_your_stripe_publishable_key'); // Replace with your Stripe key
 
         function updateProgressDetails(data) {
             const homeworkCount = Math.min((data.homeworkScores || []).length, 12);
@@ -133,14 +133,12 @@
         });
 
         document.getElementById('donateButton').addEventListener('click', () => {
-            fetch('/create-checkout-session', {
+            fetch('/create-checkout-session', { // Note: Missing /api/—fix if endpoint exists
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             })
             .then(res => {
-                if (!res.ok) {
-                    return res.json().then(errData => { throw new Error(errData.error || 'Unknown server error'); });
-                }
+                if (!res.ok) return res.json().then(errData => { throw new Error(errData.error || 'Unknown server error'); });
                 return res.json();
             })
             .then(session => stripe.redirectToCheckout({ sessionId: session.id }))
@@ -156,12 +154,8 @@
                 const targetId = link.getAttribute('href').substring(1);
                 const targetSection = document.getElementById(targetId);
                 if (targetSection) {
-                    document.querySelectorAll('.content section').forEach(section => {
-                        section.classList.remove('active');
-                    });
-                    document.querySelectorAll('.toc a').forEach(a => {
-                        a.classList.remove('active');
-                    });
+                    document.querySelectorAll('.content section').forEach(section => section.classList.remove('active'));
+                    document.querySelectorAll('.toc a').forEach(a => a.classList.remove('active'));
                     targetSection.classList.add('active');
                     link.classList.add('active');
                     document.getElementById('breadcrumb').textContent = `Dashboard > ${link.textContent}`;
@@ -174,7 +168,10 @@
         fetch('/api/user-data')
             .then(res => {
                 if (!res.ok) {
-                    if (res.status === 401) window.location.href = '/index.html';
+                    if (res.status === 401) {
+                        console.log('User not logged in, redirecting to login');
+                        window.location.href = '/index.html';
+                    }
                     throw new Error(`Failed to fetch user data: ${res.status}`);
                 }
                 return res.json();
@@ -196,9 +193,8 @@
                     : '<li>No quizzes completed</li>';
                 updateProgressDetails(data);
 
-                // Fetch lessons
                 let allLessons = [];
-                fetch('/lessons')
+                fetch('/api/lessons')
                     .then(res => {
                         if (!res.ok) throw new Error(`Failed to fetch lessons: ${res.status}`);
                         return res.json();
@@ -272,12 +268,8 @@
                             const targetId = e.target.value;
                             const target = document.getElementById(targetId);
                             if (target) {
-                                document.querySelectorAll('.content section').forEach(section => {
-                                    section.classList.remove('active');
-                                });
-                                document.querySelectorAll('.toc a').forEach(a => {
-                                    a.classList.remove('active');
-                                });
+                                document.querySelectorAll('.content section').forEach(section => section.classList.remove('active'));
+                                document.querySelectorAll('.toc a').forEach(a => a.classList.remove('active'));
                                 document.getElementById('lessons').classList.add('active');
                                 document.querySelector('.toc a[href="#lessons"]').classList.add('active');
                                 target.scrollIntoView({ behavior: 'smooth' });
@@ -286,20 +278,16 @@
                             }
                             e.target.value = '';
                         });
-                        levelFilter.addEventListener('change', (e) => {
-                            renderLessons(e.target.value);
-                        });
+                        levelFilter.addEventListener('change', (e) => renderLessons(e.target.value));
 
-                        // Fetch references
-                        fetch('/references')
+                        fetch('/api/references')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
                                 return res.json();
                             })
                             .then(references => {
                                 console.log('References received:', references);
-                                const referenceList = document.getElementById('referenceList');
-                                referenceList.innerHTML = references.length > 0 
+                                document.getElementById('referenceList').innerHTML = references.length > 0 
                                     ? references.map(ref => `
                                         <li>
                                             <input type="checkbox" class="refCheckbox" data-id="${ref._id}" ${data.referencesVisited && data.referencesVisited.includes(ref._id) ? 'checked' : ''}>
@@ -307,35 +295,18 @@
                                         </li>
                                     `).join('')
                                     : '<li>No references available</li>';
-                                document.querySelectorAll('.refCheckbox').forEach(checkbox => {
-                                    checkbox.addEventListener('change', async (e) => {
-                                        const refId = e.target.dataset.id;
-                                        if (e.target.checked) {
-                                            await fetch('/mark-reference-visited', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ referenceId: refId })
-                                            });
-                                            console.log('Marked reference visited:', refId);
-                                            fetch('/api/user-data').then(res => res.json()).then(updateData => {
-                                                updateProgressDetails(updateData);
-                                            });
-                                        }
-                                    });
-                                });
+                                // Note: /mark-reference-visited not implemented—remove or add endpoint
                             })
                             .catch(err => console.error('Error loading references:', err));
 
-                        // Fetch blogs
-                        fetch('/blogs')
+                        fetch('/api/blogs')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch blogs: ${res.status}`);
                                 return res.json();
                             })
                             .then(blogs => {
                                 console.log('Blogs received:', blogs);
-                                const blogList = document.getElementById('blogList');
-                                blogList.innerHTML = `
+                                document.getElementById('blogList').innerHTML = `
                                     ${blogs.map(blog => `
                                         <details class="blog-post">
                                             <summary>${blog.title}</summary>
@@ -347,16 +318,14 @@
                             })
                             .catch(err => console.error('Error loading blogs:', err));
 
-                        // Fetch leaderboard
-                        fetch('/leaderboard')
+                        fetch('/api/leaderboard')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch leaderboard: ${res.status}`);
                                 return res.json();
                             })
                             .then(users => {
                                 console.log('Leaderboard received:', users);
-                                const leaderboardList = document.getElementById('leaderboardList');
-                                leaderboardList.innerHTML = users.length > 0 
+                                document.getElementById('leaderboardList').innerHTML = users.length > 0 
                                     ? users.map((user, index) => `
                                         <li>${index + 1}. ${user.name}: ${user.score}%</li>
                                     `).join('')
@@ -364,16 +333,14 @@
                             })
                             .catch(err => console.error('Error loading leaderboard:', err));
 
-                        // Fetch quizzes
-                        fetch('/quizzes')
+                        fetch('/api/quizzes')
                             .then(res => {
                                 if (!res.ok) throw new Error(`Failed to fetch quizzes: ${res.status}`);
                                 return res.json();
                             })
                             .then(quizzes => {
                                 console.log('Quizzes received:', quizzes);
-                                const quizList = document.getElementById('quizList');
-                                quizList.innerHTML = `
+                                document.getElementById('quizList').innerHTML = `
                                     ${quizzes.map(quiz => `
                                         <div class="quiz" data-id="${quiz._id}">
                                             <h3>${quiz.title} (${quiz.level})</h3>
@@ -424,15 +391,16 @@
                                             clearInterval(timer);
                                             const answers = Array.from(e.target.querySelectorAll('select, input')).map(input => input.value);
                                             try {
-                                                const response = await fetch('/submit-quiz', {
+                                                const response = await fetch('/api/submit-quiz', {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
                                                     body: JSON.stringify({ quizId, answers })
                                                 });
-                                                const responseText = await response.text();
-                                                console.log('Quiz response:', { status: response.status, text: responseText });
-                                                if (!response.ok) throw new Error(`Quiz fetch failed: ${response.status} - ${responseText}`);
-                                                const result = JSON.parse(responseText);
+                                                if (!response.ok) {
+                                                    const errorText = await response.text();
+                                                    throw new Error(`Quiz submission failed: ${response.status} - ${errorText}`);
+                                                }
+                                                const result = await response.json();
                                                 console.log('Quiz result:', result);
                                                 const percentage = Math.round((result.score / result.total) * 100);
                                                 let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
@@ -449,6 +417,7 @@
                                             } catch (err) {
                                                 console.error('Quiz fetch error:', err.message);
                                                 alert('Failed to submit quiz: ' + err.message);
+                                                if (err.message.includes('401')) window.location.href = '/index.html';
                                             }
                                         });
                                     });
@@ -463,15 +432,16 @@
                                 const answers = Array.from(form.querySelectorAll('input, select')).map(input => input.value);
                                 console.log('Submitting homework:', { lessonId, answers });
                                 try {
-                                    const response = await fetch('/homework', {
+                                    const response = await fetch('/api/homework', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ lessonId, answers })
                                     });
-                                    const responseText = await response.text();
-                                    console.log('Homework response:', { status: response.status, text: responseText });
-                                    if (!response.ok) throw new Error(`Homework fetch failed: ${response.status} - ${responseText}`);
-                                    const result = JSON.parse(responseText);
+                                    if (!response.ok) {
+                                        const errorText = await response.text();
+                                        throw new Error(`Homework submission failed: ${response.status} - ${errorText}`);
+                                    }
+                                    const result = await response.json();
                                     console.log('Homework result:', result);
                                     const percentage = Math.round((result.score / result.total) * 100);
                                     let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
@@ -486,6 +456,7 @@
                                 } catch (err) {
                                     console.error('Homework fetch error:', err.message);
                                     alert('Failed to submit homework: ' + err.message);
+                                    if (err.message.includes('401')) window.location.href = '/index.html';
                                 }
                             });
                         });
@@ -497,15 +468,16 @@
                                 const answers = Array.from(form.querySelectorAll('input:checked')).map(input => input.value === 'true');
                                 console.log('Submitting comprehension:', { lessonId, answers });
                                 try {
-                                    const response = await fetch('/comprehension', {
+                                    const response = await fetch('/api/comprehension', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ lessonId, answers })
                                     });
-                                    const responseText = await response.text();
-                                    console.log('Comprehension response:', { status: response.status, text: responseText });
-                                    if (!response.ok) throw new Error(`Comprehension fetch failed: ${response.status} - ${responseText}`);
-                                    const result = JSON.parse(responseText);
+                                    if (!response.ok) {
+                                        const errorText = await response.text();
+                                        throw new Error(`Comprehension submission failed: ${response.status} - ${errorText}`);
+                                    }
+                                    const result = await response.json();
                                     console.log('Comprehension result:', result);
                                     const percentage = Math.round((result.score / result.total) * 100);
                                     let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
@@ -520,6 +492,7 @@
                                 } catch (err) {
                                     console.error('Comprehension fetch error:', err.message);
                                     alert('Failed to submit comprehension: ' + err.message);
+                                    if (err.message.includes('401')) window.location.href = '/index.html';
                                 }
                             });
                         });
@@ -533,8 +506,8 @@
                         function normalizeText(text) {
                             return text.toLowerCase().trim()
                                 .replace(/’/g, "'")
-                                .replace(/isation/g, 'ization') // Normalize British to American spelling
-                                .replace(/[^a-z0-9']/g, ''); // Remove special chars except apostrophes
+                                .replace(/isation/g, 'ization')
+                                .replace(/[^a-z0-9']/g, '');
                         }
 
                         function levenshteinDistance(a, b) {
@@ -545,9 +518,9 @@
                                 for (let i = 1; i <= a.length; i++) {
                                     const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
                                     matrix[j][i] = Math.min(
-                                        matrix[j][i - 1] + 1, // deletion
-                                        matrix[j - 1][i] + 1, // insertion
-                                        matrix[j - 1][i - 1] + indicator // substitution
+                                        matrix[j][i - 1] + 1,
+                                        matrix[j - 1][i] + 1,
+                                        matrix[j - 1][i - 1] + indicator
                                     );
                                 }
                             }
@@ -575,19 +548,23 @@
                                     const spokenText = normalizeText(event.results[0][0].transcript);
                                     const expectedText = normalizeText(phrase);
                                     console.log('Heard:', spokenText, 'Expected:', expectedText);
-                                    const isCorrect = spokenText === expectedText || levenshteinDistance(spokenText, expectedText) <= 2; // Allow minor differences
+                                    const isCorrect = spokenText === expectedText || levenshteinDistance(spokenText, expectedText) <= 2;
                                     resultSpan.textContent = isCorrect ? 'Correct!' : `Try again: heard "${spokenText}"`;
                                     isRecognizing = false;
                                     button.disabled = false;
 
-                                    fetch('/pronunciation', {
+                                    fetch('/api/pronunciation', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ lessonId, phrase, isCorrect })
                                     })
-                                    .then(res => res.text().then(text => ({ ok: res.ok, status: res.status, text })))
-                                    .then(({ ok, status, text }) => {
-                                        if (!ok) throw new Error(`Pronunciation save failed: ${status} - ${text}`);
+                                    .then(res => {
+                                        if (!res.ok) {
+                                            return res.text().then(text => { throw new Error(`Pronunciation save failed: ${res.status} - ${text}`); });
+                                        }
+                                        return res.text();
+                                    })
+                                    .then(text => {
                                         console.log('Pronunciation saved successfully:', text);
                                         fetch('/api/user-data').then(res => res.json()).then(updateData => {
                                             document.getElementById('pronunciationScores').innerHTML = updateData.pronunciationScores.map(s => `<li>${s.phrase}: ${s.correct ? 'Correct' : 'Incorrect'} (Attempts: ${s.attempts})</li>`).join('');
@@ -597,6 +574,7 @@
                                     .catch(err => {
                                         console.error('Pronunciation save error:', err.message);
                                         alert('Failed to save pronunciation: ' + err.message);
+                                        if (err.message.includes('401')) window.location.href = '/index.html';
                                     });
                                 };
 
