@@ -4,10 +4,77 @@
     <meta charset="UTF-8">
     <title>Dashboard</title>
     <link rel="stylesheet" href="/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Arial&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://js.stripe.com/v3/"></script>
     <style>
-        /* Welcome Section */
+        /* Sidebar Styling Inspired by aoventures.io */
+        .sidebar {
+            width: 250px; /* Slimmer width */
+            padding: 20px 10px; /* Reduced horizontal padding */
+            background: #fff;
+            border-right: 1px solid #e0e0e0;
+            font-family: 'Inter', sans-serif;
+        }
+        .sidebar h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0 0 20px;
+            padding-left: 10px;
+        }
+        .toc {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .toc li {
+            margin: 0;
+            padding: 8px 10px; /* Tight spacing */
+        }
+        .toc a {
+            text-decoration: none;
+            color: #333;
+            font-size: 16px;
+            font-weight: 400; /* Regular weight */
+            display: block;
+            transition: color 0.3s;
+        }
+        .toc a:hover, .toc a.active {
+            color: #3498db;
+        }
+        .toc button {
+            background: none;
+            border: none;
+            color: #333;
+            font-size: 16px;
+            font-weight: 400;
+            padding: 8px 10px;
+            text-align: left;
+            width: 100%;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        .toc button:hover {
+            color: #3498db;
+        }
+        #lessonJump {
+            margin: 20px 10px 0;
+            padding: 8px;
+            width: calc(100% - 20px);
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+        }
+        /* Existing Content Styling (Unchanged) */
+        .content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .breadcrumb {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+        }
         #welcome {
             background: #fff;
             color: #333;
@@ -27,7 +94,25 @@
             font-size: 16px;
             line-height: 1.6;
         }
-        /* Lessons Listing */
+        .progress-container {
+            background: #e0e0e0;
+            border-radius: 5px;
+            height: 20px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            background: #27ae60;
+            height: 100%;
+            transition: width 0.3s;
+        }
+        #progressTip {
+            color: #27ae60;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        #achievements {
+            color: #7f8c8d;
+        }
         .lesson {
             background: #fff;
             border-bottom: 1px solid #e0e0e0;
@@ -74,36 +159,14 @@
         .lesson-content button:hover {
             background: #2980b9;
         }
-        /* Progress Section */
-        .progress-container {
-            background: #e0e0e0;
-            border-radius: 5px;
-            height: 20px;
-            overflow: hidden;
-        }
-        .progress-bar {
-            background: #27ae60; /* Vibrant green */
-            height: 100%;
-            transition: width 0.3s;
-        }
-        #progressTip {
-            color: #27ae60; /* Matches progress bar */
-            font-weight: 700;
-            margin: 10px 0;
-        }
-        #achievements {
-            color: #7f8c8d; /* Subtle gray */
-        }
-        /* Reference Listing */
         .reference-list li {
-            list-style: none; /* No bullets */
+            list-style: none;
             margin: 10px 0;
             padding: 5px 0;
         }
         .refCheckbox {
             margin-right: 10px;
         }
-        /* Blog Listing */
         .blog-post {
             border-bottom: 1px solid #e0e0e0;
             margin: 10px 0;
@@ -126,7 +189,7 @@
     </style>
 </head>
 <body>
-    <div class="container dashboard-container">
+    <div class="container dashboard-container" style="display: flex;">
         <aside class="sidebar">
             <h1>Welcome, <span id="username"></span>!</h1>
             <ul class="toc">
@@ -221,40 +284,40 @@
         const stripe = Stripe('pk_test_your_stripe_publishable_key');
 
         function updateProgressDetails(data) {
-        const totalTasks = 
-            data.lessons.filter(l => l.homework).length + 
-            data.lessons.filter(l => l.comprehension).length + 
-            data.lessons.filter(l => l.pronunciation).length + 
-            data.quizzes.length;
+            const totalTasks = 
+                data.lessons.filter(l => l.homework).length + 
+                data.lessons.filter(l => l.comprehension).length + 
+                data.lessons.filter(l => l.pronunciation).length + 
+                data.quizzes.length;
 
-        const homeworkCount = (data.homeworkScores || []).length;
-        const pronunciationCount = (data.pronunciationScores || []).filter(s => s.correct).length;
-        const comprehensionCount = (data.comprehensionScores || []).length;
-        const quizCount = (data.quizScores || []).length;
-        const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
+            const homeworkCount = (data.homeworkScores || []).length;
+            const pronunciationCount = (data.pronunciationScores || []).filter(s => s.correct).length;
+            const comprehensionCount = (data.comprehensionScores || []).length;
+            const quizCount = (data.quizScores || []).length;
+            const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
 
-        document.getElementById('score').textContent = `${data.score}%`;
-        document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
-        document.getElementById('progressBar').style.width = `${data.score}%`;
-        document.getElementById('progressDetails').innerHTML = `
-            Homework: ${homeworkCount}/${data.lessons.filter(l => l.homework).length}<br>
-            Comprehension: ${comprehensionCount}/${data.lessons.filter(l => l.comprehension).length}<br>
-            Pronunciation: ${pronunciationCount}/${data.lessons.filter(l => l.pronunciation).length}<br>
-            Quizzes: ${quizCount}/${data.quizzes.length}
-        `;
-        document.getElementById('progressTip').textContent = completedTasks < 20 ? 'Try more tasks to boost your score!' : 'Great progress—keep it up!';
-        document.getElementById('recommendation').textContent = data.recommendation || '';
-        const badgeImages = {
-            'Pronunciation Pro': '/images/pronunciation-pro.webp',
-            'Blog Explorer': '/images/blog-explorer.webp',
-            'Quiz Master': '/images/quiz-master.webp'
-        };
-        document.getElementById('achievements').innerHTML = data.achievements && data.achievements.length > 0 
-            ? `<h3>Achievements</h3><ul class="badge-list">${data.achievements.map(a => `
-                <li><img src="${badgeImages[a.name]}" alt="${a.name}" class="badge-icon"> ${a.name} (Earned: ${new Date(a.dateEarned).toLocaleDateString()})</li>
-            `).join('')}</ul>`
-            : '<p>No achievements yet—keep learning!</p>';
-    }
+            document.getElementById('score').textContent = `${data.score}%`;
+            document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
+            document.getElementById('progressBar').style.width = `${data.score}%`;
+            document.getElementById('progressDetails').innerHTML = `
+                Homework: ${homeworkCount}/${data.lessons.filter(l => l.homework).length}<br>
+                Comprehension: ${comprehensionCount}/${data.lessons.filter(l => l.comprehension).length}<br>
+                Pronunciation: ${pronunciationCount}/${data.lessons.filter(l => l.pronunciation).length}<br>
+                Quizzes: ${quizCount}/${data.quizzes.length}
+            `;
+            document.getElementById('progressTip').textContent = completedTasks < 20 ? 'Try more tasks to boost your score!' : 'Great progress—keep it up!';
+            document.getElementById('recommendation').textContent = data.recommendation || '';
+            const badgeImages = {
+                'Pronunciation Pro': '/images/pronunciation-pro.webp',
+                'Blog Explorer': '/images/blog-explorer.webp',
+                'Quiz Master': '/images/quiz-master.webp'
+            };
+            document.getElementById('achievements').innerHTML = data.achievements && data.achievements.length > 0 
+                ? `<h3>Achievements</h3><ul class="badge-list">${data.achievements.map(a => `
+                    <li><img src="${badgeImages[a.name]}" alt="${a.name}" class="badge-icon"> ${a.name} (Earned: ${new Date(a.dateEarned).toLocaleDateString()})</li>
+                `).join('')}</ul>`
+                : '<p>No achievements yet—keep learning!</p>';
+        }
 
         document.getElementById('logoutButton').addEventListener('click', () => {
             fetch('/api/logout', { method: 'GET' })
@@ -633,10 +696,7 @@
                         let isRecognizing = false;
 
                         function normalizeText(text) {
-                            return text.toLowerCase().trim()
-                                .replace(/’/g, "'")
-                                .replace(/isation/g, 'ization')
-                                .replace(/[^a-z0-9']/g, '');
+                            return text.toLowerCase().trim().replace(/’/g, "'");
                         }
 
                         function levenshteinDistance(a, b) {
