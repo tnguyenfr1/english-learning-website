@@ -4,6 +4,9 @@ const session = require('express-session');
 const MongoStore = require('connect-mongodb-session')(session);
 const bcrypt = require('bcrypt');
 const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey');
+// --- NEW: Added Nodemailer and crypto for email and token generation ---
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const app = express();
 
 app.use(express.json());
@@ -16,6 +19,17 @@ const clientOptions = {
     serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
     maxPoolSize: 10
 };
+
+// --- NEW: Nodemailer setup with Mailtrap credentials ---
+// Replace these with your Mailtrap SMTP details from mailtrap.io
+const transporter = nodemailer.createTransport({
+    host: 'sandbox.smtp.mailtrap.io',
+    port: 587,
+    auth: {
+        user: process.env.MAILTRAP_USER, // e.g., '1a2b3c4d5e6f7g8h' from Mailtrap
+        pass: process.env.MAILTRAP_PASS,  // e.g., '9i8h7g6f5e4d3c2b' from Mailtrap
+    }
+});
 
 let client;
 let db;
@@ -148,6 +162,11 @@ app.post('/api/login', async (req, res) => {
             console.log('Password mismatch for:', email);
             return res.status(401).send('Invalid credentials');
         }
+        // --- NEW: Check if user is verified before allowing login ---
+        if (!user.isVerified) {
+            console.log('User not verified:', email);
+            return res.status(403).send('Please verify your email first.');
+        }
         req.session.userId = user._id.toString();
         console.log('Login successful:', email, 'Session ID:', req.session.userId);
         res.status(200).send();
@@ -157,6 +176,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// --- NEW: Updated signup endpoint with email confirmation ---
 app.post('/api/signup', async (req, res) => {
     const { email, password, name } = req.body;
     console.log('Signup attempt:', { email });
@@ -170,16 +190,71 @@ app.post('/api/signup', async (req, res) => {
             return res.status(400).send('Email already in use');
         }
         const hashedPassword = await bcrypt.hash(password, 10);
+        // --- NEW: Generate a unique verification token ---
+        const verificationToken = crypto.randomBytes(32).toString('hex');
         const result = await users.insertOne({ 
-            email, password: hashedPassword, name, score: 0, 
-            homeworkScores: [], pronunciationScores: [], comprehensionScores: [], quizScores: [], 
-            referencesVisited: [], achievements: [], admin: false 
+            email, 
+            password: hashedPassword, 
+            name, 
+            score: 0, 
+            homeworkScores: [], 
+            pronunciationScores: [], 
+            comprehensionScores: [], 
+            quizScores: [], 
+            referencesVisited: [], 
+            achievements: [], 
+            admin: false,
+            verificationToken,  // Store token
+            isVerified: false   // Default to unverified
         });
         console.log('Signup successful:', email, 'User ID:', result.insertedId);
-        res.status(201).send();
+
+        // --- NEW: Send verification email ---
+        const confirmationUrl = `https://english-learning-website-olive.vercel.app/api/verify?token=${verificationToken}`;
+        const mailOptions = {
+            from: 'no-reply@englishlearning.com',
+            to: email,
+            subject: 'Welcome to Thuan’s English Learning! Confirm Your Email',
+            html: `
+                <h2>Hello ${name || 'Learner'}!</h2>
+                <p>Thanks for joining Thuan’s English Learning Platform!</p>
+                <p>Click <a href="${confirmationUrl}">here</a> to verify your email and start learning.</p>
+                <p>Keep this email—use it to find us anytime at <a href="https://english-learning-website-olive.vercel.app">our site</a>!</p>
+                <p>Cheers,<br>Thuan & Team</p>
+            `
+        };
+        await transporter.sendMail(mailOptions);
+        console.log('Verification email sent to:', email);
+
+        res.status(201).json({ message: 'Signup successful! Check your email to verify.' });
     } catch (err) {
         console.error('Signup error:', err.message);
         res.status(500).json({ error: 'Server error - Signup failed: ' + err.message });
+    }
+});
+
+// --- NEW: Verification endpoint to confirm email ---
+app.get('/api/verify', async (req, res) => {
+    const { token } = req.query;
+    console.log('Verification attempt with token:', token);
+    try {
+        const db = await ensureDBConnection();
+        if (!db) return res.status(500).send('Database unavailable');
+        const users = db.collection('users');
+        const user = await users.findOne({ verificationToken: token });
+        if (!user) {
+            console.log('Invalid or expired token:', token);
+            return res.status(400).send('Invalid or expired token.');
+        }
+        await users.updateOne(
+            { _id: new ObjectId(user._id) },
+            { $set: { isVerified: true }, $unset: { verificationToken: "" } }
+        );
+        console.log('User verified:', user.email);
+        res.redirect('/dashboard.html'); // Redirect to dashboard after verification
+    } catch (err) {
+        console.error('Verification error:', err.message);
+        res.status(500).send('Verification failed.');
     }
 });
 
