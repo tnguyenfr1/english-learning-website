@@ -193,8 +193,7 @@
         <aside class="sidebar">
             <h1>Welcome, <span id="username"></span>!</h1>
             <ul class="toc">
-                
-                <li><a href="#progress">Your Progress</a></li>
+                <li><a href="#progress" class="active">Your Progress</a></li> <!-- Default active -->
                 <li><a href="#homework-scores">Homework Scores</a></li>
                 <li><a href="#comprehension-scores">Comprehension Scores</a></li>
                 <li><a href="#pronunciation-scores">Pronunciation Scores</a></li>
@@ -212,9 +211,9 @@
             </select>
         </aside>
         <main class="content">
-            <div class="breadcrumb" id="breadcrumb">Dashboard</div>
+            <div class="breadcrumb" id="breadcrumb">Dashboard > Your Progress</div>
             
-            <section id="progress">
+            <section id="progress" class="active">
                 <h2>Your Progress</h2>
                 <p>Total Score: <span id="score">0%</span></p>
                 <div class="progress-container">
