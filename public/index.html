@@ -133,6 +133,21 @@
         <input type="password" id="password" name="password" required>
         <button type="submit">Sign In</button>
     </form>
+    <p><a href="#" id="forgotPassword">Forgot Password?</a></p>
+<script>
+    document.getElementById('forgotPassword').addEventListener('click', async (e) => {
+        e.preventDefault();
+        const email = prompt('Enter your email to reset password:');
+        if (!email) return;
+        const response = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const result = await response.json();
+        alert(result.message || result.error);
+    });
+</script>
     <script>
         document.getElementById('signinLink').addEventListener('click', (e) => {
             e.preventDefault();
