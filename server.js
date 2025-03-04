@@ -216,11 +216,19 @@ app.post('/api/signup', async (req, res) => {
             to: email,
             subject: 'Welcome to Thuan’s English Learning! Confirm Your Email',
             html: `
-                <h2>Hello ${name || 'Learner'}!</h2>
-                <p>Thanks for joining Thuan’s English Learning Platform!</p>
-                <p>Click <a href="${confirmationUrl}">here</a> to verify your email and start learning.</p>
-                <p>Keep this email—use it to find us anytime at <a href="https://english-learning-website-olive.vercel.app">our site</a>!</p>
-                <p>Cheers,<br>Thuan & Team</p>
+                <div style="font-family: 'SF Pro Display', -apple-system, sans-serif; background: #1d1d1e; color: #fff; padding: 40px; max-width: 600px; margin: 0 auto; border-radius: 18px;">
+                    <h2 style="font-size: 28px; font-weight: 700; color: #fff; text-align: center;">Hello ${name || 'Learner'}!</h2>
+                    <p style="font-size: 18px; line-height: 1.5; color: #d1d1d1; text-align: center;">
+                        Welcome to Thuan’s English Learning Platform! We’re excited to help you master English.
+                    </p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${confirmationUrl}" style="background: #0071e3; color: #fff; padding: 12px 24px; text-decoration: none; font-size: 17px; font-weight: 700; border-radius: 10px; display: inline-block;">Verify Your Email</a>
+                    </div>
+                    <p style="font-size: 14px; color: #d1d1d1; text-align: center;">
+                        Keep this email—visit us anytime at <a href="https://english-learning-website-olive.vercel.app" style="color: #2997ff;">our site</a>!
+                    </p>
+                    <p style="font-size: 14px; color: #d1d1d1; text-align: center;">Cheers,<br>Thuan & Team</p>
+                </div>
             `
         };
         await transporter.sendMail(mailOptions);
@@ -255,6 +263,117 @@ app.get('/api/verify', async (req, res) => {
     } catch (err) {
         console.error('Verification error:', err.message);
         res.status(500).send('Verification failed.');
+    }
+});
+
+// --- NEW: Password reset endpoint ---
+app.post('/api/reset-password', async (req, res) => {
+    const { email } = req.body;
+    console.log('Password reset request for:', email);
+    try {
+        const db = await ensureDBConnection();
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
+        const users = db.collection('users');
+        const user = await users.findOne({ email });
+        if (!user) return res.status(404).json({ error: 'Email not found.' });
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        await users.updateOne({ email }, { $set: { resetToken } });
+
+        const resetUrl = `https://english-learning-website-olive.vercel.app/api/reset-password?token=${resetToken}`;
+        const mailOptions = {
+            from: 'no-reply@englishlearning.com',
+            to: email,
+            subject: 'Reset Your Password - Thuan’s English Learning',
+            html: `
+                <div style="font-family: 'SF Pro Display', -apple-system, sans-serif; background: #1d1d1e; color: #fff; padding: 40px; max-width: 600px; margin: 0 auto; border-radius: 18px;">
+                    <h2 style="font-size: 28px; font-weight: 700; color: #fff; text-align: center;">Password Reset</h2>
+                    <p style="font-size: 18px; line-height: 1.5; color: #d1d1d1; text-align: center;">
+                        Click below to reset your password for Thuan’s English Learning Platform.
+                    </p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${resetUrl}" style="background: #0071e3; color: #fff; padding: 12px 24px; text-decoration: none; font-size: 17px; font-weight: 700; border-radius: 10px; display: inline-block;">Reset Password</a>
+                    </div>
+                    <p style="font-size: 14px; color: #d1d1d1; text-align: center;">If you didn’t request this, ignore this email.</p>
+                </div>
+            `
+        };
+        await transporter.sendMail(mailOptions);
+        console.log('Reset email sent to:', email);
+        res.json({ message: 'Check your email for a password reset link.' });
+    } catch (err) {
+        console.error('Reset password error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// --- NEW: Reset password page endpoint ---
+app.get('/api/reset-password', (req, res) => {
+    const { token } = req.query;
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Reset Password</title>
+            <link rel="stylesheet" href="https://fonts.sandbox.google.com/css2?family=SF+Pro+Display:wght@400;700&display=swap">
+            <style>
+                body { font-family: 'SF Pro Display', sans-serif; background: #1d1d1e; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+                .reset-form { background: #2c2c2e; padding: 30px; border-radius: 18px; max-width: 380px; width: 100%; }
+                h2 { font-size: 28px; font-weight: 700; text-align: center; margin: 0 0 20px; }
+                label { display: block; font-size: 14px; color: #d1d1d1; margin-bottom: 8px; }
+                input { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #434345; border-radius: 8px; background: #1d1d1e; color: #fff; font-size: 17px; box-sizing: border-box; }
+                button { width: 100%; background: #0071e3; color: #fff; border: none; padding: 12px; font-size: 17px; font-weight: 700; border-radius: 10px; cursor: pointer; }
+                button:hover { background: #005bb5; }
+            </style>
+        </head>
+        <body>
+            <form class="reset-form" id="resetForm">
+                <h2>Reset Password</h2>
+                <label for="password">New Password</label>
+                <input type="password" id="password" required>
+                <button type="submit">Reset</button>
+            </form>
+            <script>
+                document.getElementById('resetForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const password = document.getElementById('password').value;
+                    const token = new URLSearchParams(window.location.search).get('token');
+                    const response = await fetch('/api/reset-password-submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token, password })
+                    });
+                    const result = await response.json();
+                    alert(result.message || result.error);
+                    if (response.ok) window.location.href = '/index.html';
+                });
+            </script>
+        </body>
+        </html>
+    `);
+});
+
+// --- NEW: Submit reset password endpoint ---
+app.post('/api/reset-password-submit', async (req, res) => {
+    const { token, password } = req.body;
+    console.log('Password reset submission for token:', token);
+    try {
+        const db = await ensureDBConnection();
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
+        const users = db.collection('users');
+        const user = await users.findOne({ resetToken: token });
+        if (!user) return res.status(400).json({ error: 'Invalid or expired token.' });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await users.updateOne(
+            { _id: new ObjectId(user._id) },
+            { $set: { password: hashedPassword }, $unset: { resetToken: "" } }
+        );
+        console.log('Password reset successful for:', user.email);
+        res.json({ message: 'Password reset successful! Please log in.' });
+    } catch (err) {
+        console.error('Reset password submit error:', err.message);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
