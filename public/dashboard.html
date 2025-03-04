@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+    
+    <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CHWMFJB2GE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CHWMFJB2GE');
+</script>
     <meta charset="UTF-8">
     <title>Dashboard</title>
     <link rel="stylesheet" href="/styles.css">
@@ -75,25 +86,7 @@
             color: #7f8c8d;
             margin-bottom: 20px;
         }
-        #welcome {
-            background: #fff;
-            color: #333;
-            padding: 20px;
-            margin-bottom: 20px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        #welcome h2 {
-            margin: 0 0 15px;
-            font-size: 24px;
-            font-weight: 700;
-            color: #2c3e50;
-        }
-        #welcome p {
-            margin: 0 0 10px;
-            font-size: 16px;
-            line-height: 1.6;
-        }
+        /* Removed #welcome section - not used in sidebar navigation */
         .progress-container {
             background: #e0e0e0;
             border-radius: 5px;
@@ -186,6 +179,53 @@
         .blog-post summary::marker {
             display: none;
         }
+        /* --- NEW: Styling for Back to Top button --- */
+        #backToTop {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: none;
+            padding: 10px 20px;
+            background: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #backToTop:hover {
+            background: #2980b9;
+        }
+        /* --- NEW: Styling for scores list --- */
+        .scores-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .scores-list li {
+            padding: 5px 0;
+        }
+        /* --- NEW: Consistent h2 styling --- */
+        h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0 0 15px;
+        }
+        /* --- NEW: Styling for badge list (achievements) --- */
+        .badge-list {
+            list-style: none;
+            padding: 0;
+        }
+        .badge-list li {
+            padding: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+        .badge-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -212,7 +252,6 @@
         </aside>
         <main class="content">
             <div class="breadcrumb" id="breadcrumb">Dashboard > Your Progress</div>
-            
             <section id="progress" class="active">
                 <h2>Your Progress</h2>
                 <p>Total Score: <span id="score">0%</span></p>
@@ -272,7 +311,7 @@
                 <ul id="leaderboardList" class="scores-list"></ul>
             </section>
         </main>
-        <button id="backToTop" style="display: none;">Back to Top</button>
+        <button id="backToTop">Back to Top</button>
     </div>
     <script src="/script.js"></script>
     <script>
@@ -300,7 +339,12 @@
                 Pronunciation: ${pronunciationCount}/${data.lessons.filter(l => l.pronunciation).length}<br>
                 Quizzes: ${quizCount}/${data.quizzes.length}
             `;
-            document.getElementById('progressTip').textContent = completedTasks < 20 ? 'Try more tasks to boost your score!' : 'Great progress—keep it up!';
+            // --- NEW: Enhanced progress tips based on task completion ---
+            document.getElementById('progressTip').textContent = completedTasks < 20 
+                ? 'Try more tasks to boost your score!' 
+                : completedTasks < 40 
+                    ? 'Halfway there—keep going for your next badge!' 
+                    : 'Amazing progress—aim for 100%!';
             document.getElementById('recommendation').textContent = data.recommendation || '';
             const badgeImages = {
                 'Pronunciation Pro': '/images/pronunciation-pro.webp',
@@ -380,6 +424,12 @@
                     ? data.quizScores.map(s => `<li>${s.title || 'Unknown Quiz'}: ${s.score}%</li>`).join('')
                     : '<li>No quizzes completed</li>';
                 updateProgressDetails(data);
+
+                // --- NEW: One-time welcome message on first login ---
+                if (!localStorage.getItem('welcomeShown')) {
+                    alert(`Welcome, ${data.name || 'Learner'}! Start your English journey with us!`);
+                    localStorage.setItem('welcomeShown', 'true');
+                }
 
                 let allLessons = [];
                 fetch('/api/lessons')
