@@ -72,6 +72,10 @@ app.use(session({
     cookie: { maxAge: 1000 * 60 * 60 * 24 }
 }));
 
+function normalizeText(text) {
+    return text.toLowerCase().trim().replace(/’/g, "'"); // Normalize curly to straight apostrophe
+}
+
 async function updateUserScore(userId, db) {
     const users = db.collection('users');
     const user = await users.findOne({ _id: new ObjectId(userId) });
@@ -357,9 +361,11 @@ app.post('/api/homework', async (req, res) => {
         }
         let score = 0;
         const feedback = lesson.homework.map((q, i) => {
-            const isCorrect = answers[i] === q.correctAnswer;
+            const normalizedAnswer = normalizeText(answers[i]);
+            const normalizedCorrect = normalizeText(q.correctAnswer);
+            const isCorrect = normalizedAnswer === normalizedCorrect;
             if (isCorrect) score++;
-            return { question: q.question, correct: isCorrect, correctAnswer: q.correctAnswer };
+            return { question: q.question, correct: isCorrect, correctAnswer: q.correctAnswer, userAnswer: answers[i] };
         });
         const homeworkScore = Math.round((score / lesson.homework.length) * 100);
 
