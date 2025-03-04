@@ -2,50 +2,165 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login</title>
-    <link rel="stylesheet" href="/styles.css">
+    <title>English Learning Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: #fff;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .welcome-section {
+            text-align: center;
+            padding: 60px 20px;
+            max-width: 800px;
+            width: 100%;
+        }
+        .welcome-section h1 {
+            font-size: 36px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0 0 20px;
+        }
+        .welcome-section p {
+            font-size: 18px;
+            line-height: 1.6;
+            margin: 0 0 30px;
+        }
+        .cta-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        .cta-buttons button {
+            background: #3498db;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 700;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .cta-buttons button:hover {
+            background: #2980b9;
+        }
+        .cta-buttons a {
+            color: #3498db;
+            font-size: 16px;
+            text-decoration: none;
+            padding: 12px;
+            transition: color 0.3s;
+        }
+        .cta-buttons a:hover {
+            color: #2980b9;
+        }
+        .login-form {
+            display: none; /* Hidden by default */
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background: #fff;
+            margin-bottom: 20px;
+        }
+        .login-form.active {
+            display: block;
+        }
+        .login-form h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0 0 20px;
+            text-align: center;
+        }
+        .login-form label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .login-form input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .login-form button {
+            width: 100%;
+            background: #3498db;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .login-form button:hover {
+            background: #2980b9;
+        }
+    </style>
 </head>
 <body>
-    <div class="container login-container">
-        <h1>Login</h1>
-        <form id="loginForm">
-            <div class="form-group">
-                <label for="email">Email:</label>
-                <input type="email" id="email" name="email" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit">Login</button>
-        </form>
-        <p>Not registered? <a href="/signup.html">Sign up here</a></p>
+    <div class="welcome-section">
+        <h1>Hello and Welcome!</h1>
+        <p>Hi, I’m Thuan! I created this English learning platform with my awesome friend to help you master English through fun lessons, quizzes, and pronunciation practice. Sign up to start your journey and track your progress!</p>
+        <div class="cta-buttons">
+            <button id="signupButton">Sign Up</button>
+            <a href="#" id="signinLink">Sign In</a>
+        </div>
     </div>
-    
+    <form id="loginForm" class="login-form">
+        <h2>Sign In</h2>
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <button type="submit">Sign In</button>
+    </form>
     <script>
+        document.getElementById('signinLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('loginForm').classList.toggle('active');
+        });
+
+        document.getElementById('signupButton').addEventListener('click', () => {
+            window.location.href = '/signup.html'; // Assumes a signup page exists
+        });
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                alert('Please enter a valid email address');
-                return;
-            }
+            console.log('Login attempt:', { email });
+
             try {
-                const response = await fetch('/api/login', { // Line ~21 in script.js or inline
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
                 });
-                const responseText = await response.text();
-                console.log('Login response:', { status: response.status, text: responseText });
-                if (!response.ok) throw new Error(`Login failed: ${response.status} - ${responseText}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Login failed: ${response.status} - ${errorText}`);
+                }
                 console.log('Login successful, redirecting to dashboard');
                 window.location.href = '/dashboard.html';
             } catch (err) {
-                console.error('Login fetch error:', err.message);
-                alert('Failed to log in: ' + err.message);
+                console.error('Login error:', err.message);
+                alert('Login failed: ' + err.message);
             }
         });
     </script>
