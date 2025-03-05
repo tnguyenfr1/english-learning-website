@@ -667,7 +667,7 @@ app.post('/api/pronunciation', async (req, res) => {
 
 require('dotenv').config(); // If not already there
 
-const LanguageTool = require('languagetool-api');
+const languageTool = require('languagetool-api'); // Rename to avoid confusion
 
 function mapToCEFR(score, wordCount) {
     if (score < 20 || wordCount < 20) return { level: 'A1', reason: 'Basic vocabulary and structure, many errors' };
@@ -686,8 +686,11 @@ app.post('/api/grade-writing', async (req, res) => {
         console.log('Grading text:', text);
 
         // Grammar (LanguageTool)
-        const lt = new LanguageTool({ server: 'https://api.languagetool.org' });
-        const grammarCheck = await lt.check({ text, language: 'en-US' });
+        const grammarCheck = await languageTool.check({
+            text,
+            language: 'en-US',
+            apiUrl: 'https://api.languagetool.org/v2' // Explicit public API URL
+        });
         console.log('Grammar check:', grammarCheck.matches);
         const errorCount = grammarCheck.matches.length;
         let grammarScore = 100 - (errorCount * 10); // 10 points off per error
@@ -700,10 +703,10 @@ app.post('/api/grade-writing', async (req, res) => {
         const wordCount = text.split(/\s+/).length;
         const sentenceCount = text.split(/[.!?]+/).length - 1 || 1;
         const avgWordsPerSentence = wordCount / sentenceCount;
-        const wordCountBonus = Math.min(wordCount / 50, 1) * 30; // Boosted to 30% weight
+        const wordCountBonus = Math.min(wordCount / 50, 1) * 30;
 
         // Total Score
-        const score = Math.round((grammarScore * 0.7) + (wordCountBonus * 0.3)); // Grammar 70%, Length 30%
+        const score = Math.round((grammarScore * 0.7) + (wordCountBonus * 0.3));
         const cefrData = mapToCEFR(score, wordCount);
 
         // Feedback
