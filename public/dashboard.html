@@ -266,6 +266,45 @@
 .content::-webkit-scrollbar-thumb:hover {
     background: #d0d0d0;
 }
+/* Writing Section Styling */
+.writing-section {
+    margin-top: 20px;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+#writingInput {
+    width: 100%;
+    padding: 15px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    resize: vertical;
+    box-sizing: border-box;
+}
+#submitWriting {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 15px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+}
+#submitWriting:hover {
+    background: #2980b9;
+}
+#writingFeedback {
+    margin-top: 20px;
+    color: #2c3e50;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
     </style>
 </head>
 <body>
@@ -276,6 +315,7 @@
                 <li><a href="#leaderboard" class="active">Leaderboard</a></li>
                 <li><a href="#lessons">Lessons</a></li>
                 <li><a href="#quizzes">Quizzes</a></li>
+                <li><a href="#writing">Writing</a></li>
                 <li><a href="#reference">Reference</a></li>
                 <li><a href="#blog">Blog</a></li>
                 <li><button id="donateButton">Donate</button></li>
@@ -303,6 +343,14 @@
             <section id="quizzes">
                 <h2>Quizzes</h2>
                 <div id="quizList"></div>
+            </section>
+            <section id="writing">
+                <h2>Practice Your Writing</h2>
+                <div class="writing-section">
+                    <textarea id="writingInput" rows="15" placeholder="Write your essay or text here..."></textarea>
+                    <button id="submitWriting">Submit for Grading</button>
+                    <div id="writingFeedback"></div>
+                </div>
             </section>
             <section id="reference">
                 <h2>Reference Materials</h2>
@@ -844,7 +892,34 @@ fetch('/api/references')
                     })
                     .catch(err => console.error('Error loading blogs:', err));
     
-                if (!localStorage.getItem('welcomeShown')) {
+                // Writing Submission Handler
+document.getElementById('submitWriting').addEventListener('click', async () => {
+    const text = document.getElementById('writingInput').value.trim();
+    if (!text) {
+        alert('Please write something first!');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/grade-writing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        if (!response.ok) throw new Error('Grading failed');
+        const result = await response.json();
+
+        document.getElementById('writingFeedback').innerHTML = `
+            <p><strong>Score:</strong> ${result.score}/100</p>
+            <p><strong>CEFR Level:</strong> ${result.cefr}</p>
+            <p><strong>Feedback:</strong> ${result.feedback}</p>
+        `;
+    } catch (err) {
+        console.error('Writing grading error:', err);
+        alert('Failed to grade your writing: ' + err.message);
+    }
+});
+                    if (!localStorage.getItem('welcomeShown')) {
                     alert(`Welcome, ${currentUser.name || 'Learner'}! Check your progress on the leaderboard!`);
                     localStorage.setItem('welcomeShown', 'true');
                 }

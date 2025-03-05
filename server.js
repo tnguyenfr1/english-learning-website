@@ -664,6 +664,61 @@ app.post('/api/pronunciation', async (req, res) => {
     }
 });
 
+const { HfInference } = require('@huggingface/inference');
+require('dotenv').config(); // If not already there
+
+const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN); // Free token from Hugging Face
+
+// Simple CEFR mapping function
+function mapToCEFR(score, wordCount) {
+    if (score < 20 || wordCount < 20) return { level: 'A1', reason: 'Basic vocabulary and structure, many errors' };
+    if (score < 40 || wordCount < 50) return { level: 'A2', reason: 'Simple sentences, frequent errors' };
+    if (score < 60 || wordCount < 100) return { level: 'B1', reason: 'Coherent ideas, moderate errors' };
+    if (score < 80 || wordCount < 150) return { level: 'B2', reason: 'Complex sentences, some errors' };
+    if (score < 95 || wordCount < 200) return { level: 'C1', reason: 'Fluent, minor errors' };
+    return { level: 'C2', reason: 'Near-native fluency, minimal errors' };
+}
+
+app.post('/api/grade-writing', async (req, res) => {
+    const { text } = req.body;
+
+    try {
+        // Basic analysis with Hugging Face (e.g., sentiment as a proxy for coherence)
+        const sentiment = await hf.textClassification({
+            model: 'distilbert-base-uncased-finetuned-sst-2-english',
+            inputs: text
+        });
+        const sentimentScore = sentiment[0].label === 'POSITIVE' ? 50 : 30; // Rough coherence score
+
+        // Simple rule-based grading
+        const wordCount = text.split(/\s+/).length;
+        const sentenceCount = text.split(/[.!?]+/).length - 1 || 1;
+        const avgWordsPerSentence = wordCount / sentenceCount;
+        let grammarScore = 80 - (text.match(/[.!?]+/g)?.length || 0) * 2; // Penalize missing punctuation
+        grammarScore = Math.max(20, grammarScore); // Minimum score
+
+        // Calculate total score (0-100)
+        const score = Math.round((sentimentScore * 0.4) + (grammarScore * 0.4) + (Math.min(wordCount / 50, 1) * 20));
+        const cefrData = mapToCEFR(score, wordCount);
+
+        // Feedback (basic for now, can expand with more analysis)
+        const feedback = `
+            Your writing has ${wordCount} words and ${sentenceCount} sentences. 
+            ${avgWordsPerSentence < 5 ? 'Try longer sentences for complexity.' : 'Good sentence length.'}
+            ${grammarScore < 50 ? 'Check punctuation and grammar.' : 'Solid structure.'}
+            ${sentimentScore < 40 ? 'Work on coherence and positivity.' : 'Nice flow!'}
+        `;
+
+        res.json({
+            score,
+            cefr: cefrData.level,
+            feedback
+        });
+    } catch (error) {
+        console.error('Error grading writing:', error);
+        res.status(500).json({ error: 'Failed to grade writing' });
+    }
+});
 app.get('/api/logout', (req, res) => {
     console.log('Logout attempt, session:', req.session);
     req.session.destroy((err) => {
