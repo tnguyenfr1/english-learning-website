@@ -285,7 +285,7 @@ app.post('/api/reset-password', async (req, res) => {
         const mailOptions = {
             from: 'no-reply@englishlearning.com',
             to: email,
-            subject: 'Reset Your Password - Thuan’s English Learning',
+            subject: 'Reset Your Password - Learn English with Thuan',
             html: `
                 <div style="font-family: 'SF Pro Display', -apple-system, sans-serif; background: #1d1d1e; color: #fff; padding: 40px; max-width: 600px; margin: 0 auto; border-radius: 18px;">
                     <h2 style="font-size: 28px; font-weight: 700; color: #fff; text-align: center;">Password Reset</h2>
