@@ -686,20 +686,25 @@ app.post('/api/grade-writing', async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'No text provided' });
 
-    
-    if (!process.env.HUGGINGFACE_API_TOKEN) {
-        console.error('HUGGINGFACE_API_TOKEN is not set');
-        return res.status(500).json({ error: 'Server configuration error: Missing API token' });
-    }
-
+    const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN || '');
     try {
         console.log('Grading text:', text);
-        const sentiment = await hf.textClassification({
-            model: 'distilbert-base-uncased-finetuned-sst-2-english',
-            inputs: text
-        });
-        console.log('Sentiment result:', sentiment);
-        const sentimentScore = sentiment[0].label === 'POSITIVE' ? 50 : 30;
+
+        let sentimentScore = 30; // Default fallback
+        if (process.env.HUGGINGFACE_API_TOKEN) {
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('API timeout')), 8000) // 8s to stay under Vercel’s 10s
+            );
+            const apiPromise = hf.textClassification({
+                model: 'distilbert-base-uncased-finetuned-sst-2-english',
+                inputs: text
+            });
+            const sentiment = await Promise.race([apiPromise, timeoutPromise]);
+            console.log('Sentiment result:', sentiment);
+            sentimentScore = sentiment[0].label === 'POSITIVE' ? 50 : 30;
+        } else {
+            console.warn('No HUGGINGFACE_API_TOKEN, using basic grading');
+        }
 
         const wordCount = text.split(/\s+/).length;
         const sentenceCount = text.split(/[.!?]+/).length - 1 || 1;
@@ -715,16 +720,20 @@ app.post('/api/grade-writing', async (req, res) => {
             ${avgWordsPerSentence < 5 ? 'Try longer sentences for complexity.' : 'Good sentence length.'}
             ${grammarScore < 50 ? 'Check punctuation and grammar.' : 'Solid structure.'}
             ${sentimentScore < 40 ? 'Work on coherence and positivity.' : 'Nice flow!'}
+            ${!process.env.HUGGINGFACE_API_TOKEN ? 'Note: Advanced grading unavailable without API token.' : ''}
         `;
 
+        res.json({ score, cefr: cefrData.level, feedback });
+    } catch (error) {
+        console.error('Grading error:', error.message, error.stack);
+        const wordCount = text.split(/\s+/).length;
+        const score = Math.min(wordCount / 50 * 100, 100); // Fallback on timeout
+        const cefrData = mapToCEFR(score, wordCount);
         res.json({
             score,
             cefr: cefrData.level,
-            feedback
+            feedback: 'Grading timed out—used basic score. Check API setup.'
         });
-    } catch (error) {
-        console.error('Grading error:', error.message, error.stack);
-        res.status(500).json({ error: 'Failed to grade writing', details: error.message });
     }
 });
 app.get('/api/logout', (req, res) => {
