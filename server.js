@@ -664,15 +664,12 @@ app.post('/api/pronunciation', async (req, res) => {
     }
 });
 
-const { HfInference } = require('@huggingface/inference');
+
 require('dotenv').config(); // If not already there
 
-const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN); // Free token from Hugging Face
+const { HfInference } = require('@huggingface/inference');
+const LanguageTool = require('languagetool-api');
 
-// Simple CEFR mapping function
-
-
-// Simple CEFR mapping function
 function mapToCEFR(score, wordCount) {
     if (score < 20 || wordCount < 20) return { level: 'A1', reason: 'Basic vocabulary and structure, many errors' };
     if (score < 40 || wordCount < 50) return { level: 'A2', reason: 'Simple sentences, frequent errors' };
@@ -690,11 +687,10 @@ app.post('/api/grade-writing', async (req, res) => {
     try {
         console.log('Grading text:', text);
 
-        let sentimentScore = 30; // Default fallback
+        // Sentiment (Hugging Face)
+        let sentimentScore = 30;
         if (process.env.HUGGINGFACE_API_TOKEN) {
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('API timeout')), 8000) // 8s to stay under Vercel’s 10s
-            );
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('API timeout')), 8000));
             const apiPromise = hf.textClassification({
                 model: 'distilbert-base-uncased-finetuned-sst-2-english',
                 inputs: text
@@ -702,37 +698,47 @@ app.post('/api/grade-writing', async (req, res) => {
             const sentiment = await Promise.race([apiPromise, timeoutPromise]);
             console.log('Sentiment result:', sentiment);
             sentimentScore = sentiment[0].label === 'POSITIVE' ? 50 : 30;
-        } else {
-            console.warn('No HUGGINGFACE_API_TOKEN, using basic grading');
         }
 
+        // Grammar (LanguageTool)
+        const lt = new LanguageTool();
+        const grammarCheck = await lt.check({ text, language: 'en-US' });
+        console.log('Grammar check:', grammarCheck.matches);
+        const errorCount = grammarCheck.matches.length;
+        let grammarScore = 100 - (errorCount * 10); // 10 points off per error
+        grammarScore = Math.max(0, grammarScore); // Minimum 0
+        const grammarFeedback = errorCount > 0 
+            ? grammarCheck.matches.map(m => `${m.message} (e.g., "${m.context.text.substring(m.context.offset, m.context.offset + m.context.length)}")`).join('; ')
+            : 'No grammar errors found!';
+
+        // Word Count
         const wordCount = text.split(/\s+/).length;
         const sentenceCount = text.split(/[.!?]+/).length - 1 || 1;
         const avgWordsPerSentence = wordCount / sentenceCount;
-        let grammarScore = 80 - (text.match(/[.!?]+/g)?.length || 0) * 2;
-        grammarScore = Math.max(20, grammarScore);
+        const wordCountBonus = Math.min(wordCount / 50, 1) * 20;
 
-        const score = Math.round((sentimentScore * 0.4) + (grammarScore * 0.4) + (Math.min(wordCount / 50, 1) * 20));
+        // Total Score
+        const score = Math.round((sentimentScore * 0.3) + (grammarScore * 0.5) + (wordCountBonus * 0.2));
         const cefrData = mapToCEFR(score, wordCount);
 
+        // Feedback
         const feedback = `
             Your writing has ${wordCount} words and ${sentenceCount} sentences. 
             ${avgWordsPerSentence < 5 ? 'Try longer sentences for complexity.' : 'Good sentence length.'}
-            ${grammarScore < 50 ? 'Check punctuation and grammar.' : 'Solid structure.'}
-            ${sentimentScore < 40 ? 'Work on coherence and positivity.' : 'Nice flow!'}
-            ${!process.env.HUGGINGFACE_API_TOKEN ? 'Note: Advanced grading unavailable without API token.' : ''}
+            ${grammarScore < 50 ? 'Check your grammar: ' + grammarFeedback : 'Solid grammar: ' + grammarFeedback}
+            ${sentimentScore < 40 ? 'Work on coherence and tone.' : 'Nice flow and tone!'}
         `;
 
         res.json({ score, cefr: cefrData.level, feedback });
     } catch (error) {
         console.error('Grading error:', error.message, error.stack);
         const wordCount = text.split(/\s+/).length;
-        const score = Math.min(wordCount / 50 * 100, 100); // Fallback on timeout
+        const score = Math.min(wordCount / 50 * 100, 100);
         const cefrData = mapToCEFR(score, wordCount);
         res.json({
             score,
             cefr: cefrData.level,
-            feedback: 'Grading timed out—used basic score. Check API setup.'
+            feedback: 'Grading failed—used basic score. Check server logs.'
         });
     }
 });
