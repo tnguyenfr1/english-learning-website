@@ -1,17 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-    
     <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-CHWMFJB2GE"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-CHWMFJB2GE');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CHWMFJB2GE"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-CHWMFJB2GE');
+    </script>
     <meta charset="UTF-8">
     <title>Dashboard</title>
     <link rel="stylesheet" href="/styles.css">
@@ -20,8 +17,8 @@
     <style>
         /* Sidebar Styling Inspired by aoventures.io */
         .sidebar {
-            width: 250px; /* Slimmer width */
-            padding: 20px 10px; /* Reduced horizontal padding */
+            width: 250px;
+            padding: 20px 10px;
             background: #fff;
             border-right: 1px solid #e0e0e0;
             font-family: 'Inter', sans-serif;
@@ -40,13 +37,13 @@
         }
         .toc li {
             margin: 0;
-            padding: 8px 10px; /* Tight spacing */
+            padding: 8px 10px;
         }
         .toc a {
             text-decoration: none;
             color: #333;
             font-size: 16px;
-            font-weight: 400; /* Regular weight */
+            font-weight: 400;
             display: block;
             transition: color 0.3s;
         }
@@ -75,7 +72,7 @@
             font-family: 'Inter', sans-serif;
             font-size: 16px;
         }
-        /* Existing Content Styling (Unchanged) */
+        /* Content Styling */
         .content {
             flex: 1;
             padding: 20px;
@@ -86,100 +83,20 @@
             color: #7f8c8d;
             margin-bottom: 20px;
         }
-        /* Removed #welcome section - not used in sidebar navigation */
-        .progress-container {
-            background: #e0e0e0;
-            border-radius: 5px;
-            height: 20px;
-            overflow: hidden;
-        }
-        .progress-bar {
-            background: #27ae60;
-            height: 100%;
-            transition: width 0.3s;
-        }
-        #progressTip {
-            color: #27ae60;
+        .content section {
+    display: none;
+}
+.content section.active {
+    display: block;
+}
+        /* Consistent h2 */
+        h2 {
+            font-size: 24px;
             font-weight: 700;
-            margin: 10px 0;
-        }
-        #achievements {
-            color: #7f8c8d;
-        }
-        .lesson {
-            background: #fff;
-            border-bottom: 1px solid #e0e0e0;
-            margin: 10px 0;
-            padding: 15px;
-            transition: background 0.3s;
-        }
-        .lesson:hover {
-            background: #f5f5f5;
-        }
-        .lesson summary {
-            font-weight: normal;
             color: #2c3e50;
-            cursor: pointer;
-            padding: 0;
-            background: none;
-            list-style: none;
+            margin: 0 0 15px;
         }
-        .lesson summary::-webkit-details-marker {
-            display: none;
-        }
-        .lesson summary::marker {
-            display: none;
-        }
-        .lesson-content {
-            padding: 15px 0 0;
-            margin-top: 10px;
-        }
-        .lesson-content h3, .lesson-content h4 {
-            color: #2980b9;
-            margin: 10px 0;
-        }
-        .lesson-content form {
-            margin: 10px 0;
-        }
-        .lesson-content button {
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .lesson-content button:hover {
-            background: #2980b9;
-        }
-        .reference-list li {
-            list-style: none;
-            margin: 10px 0;
-            padding: 5px 0;
-        }
-        .refCheckbox {
-            margin-right: 10px;
-        }
-        .blog-post {
-            border-bottom: 1px solid #e0e0e0;
-            margin: 10px 0;
-            padding: 15px 0;
-        }
-        .blog-post summary {
-            font-weight: normal;
-            color: #2c3e50;
-            cursor: pointer;
-            padding: 0;
-            background: none;
-            list-style: none;
-        }
-        .blog-post summary::-webkit-details-marker {
-            display: none;
-        }
-        .blog-post summary::marker {
-            display: none;
-        }
-        /* --- NEW: Styling for Back to Top button --- */
+        /* Back to Top */
         #backToTop {
             position: fixed;
             bottom: 20px;
@@ -195,36 +112,49 @@
         #backToTop:hover {
             background: #2980b9;
         }
-        /* --- NEW: Styling for scores list --- */
-        .scores-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
+        /* Leaderboard Table Styling (Premier League Style) */
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Inter', sans-serif;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
-        .scores-list li {
-            padding: 5px 0;
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
         }
-        /* --- NEW: Consistent h2 styling --- */
-        h2 {
-            font-size: 24px;
+        .leaderboard-table th {
+            background: #f5f5f5;
             font-weight: 700;
             color: #2c3e50;
-            margin: 0 0 15px;
+            font-size: 14px;
         }
-        /* --- NEW: Styling for badge list (achievements) --- */
-        .badge-list {
-            list-style: none;
-            padding: 0;
+        .leaderboard-table td {
+            font-size: 14px;
+            color: #333;
         }
-        .badge-list li {
-            padding: 5px 0;
-            display: flex;
-            align-items: center;
+        .leaderboard-table tr:nth-child(even) {
+            background: #fafafa;
         }
-        .badge-icon {
-            width: 24px;
-            height: 24px;
-            margin-right: 10px;
+        .leaderboard-table tr:hover {
+            background: #f0f0f0;
+        }
+        .leaderboard-table .position {
+            width: 60px;
+        }
+        .leaderboard-table .name {
+            text-align: left;
+            width: 200px;
+        }
+        .leaderboard-table .total-score {
+            font-weight: 700;
+            color: #27ae60;
+        }
+        .leaderboard-table .current-user {
+            background: #e6f3ff; /* Light blue highlight for current user */
+            font-weight: 700;
         }
     </style>
 </head>
@@ -233,16 +163,11 @@
         <aside class="sidebar">
             <h1>Welcome, <span id="username"></span>!</h1>
             <ul class="toc">
-                <li><a href="#progress" class="active">Your Progress</a></li> <!-- Default active -->
-                <li><a href="#homework-scores">Homework Scores</a></li>
-                <li><a href="#comprehension-scores">Comprehension Scores</a></li>
-                <li><a href="#pronunciation-scores">Pronunciation Scores</a></li>
-                <li><a href="#quiz-scores">Quiz Scores</a></li>
+                <li><a href="#leaderboard" class="active">Leaderboard</a></li>
                 <li><a href="#lessons">Lessons</a></li>
                 <li><a href="#quizzes">Quizzes</a></li>
                 <li><a href="#reference">Reference</a></li>
                 <li><a href="#blog">Blog</a></li>
-                <li><a href="#leaderboard">Leaderboard</a></li>
                 <li><button id="donateButton">Donate</button></li>
                 <li><button id="logoutButton">Log Out</button></li>
             </ul>
@@ -251,35 +176,7 @@
             </select>
         </aside>
         <main class="content">
-            <div class="breadcrumb" id="breadcrumb">Dashboard > Your Progress</div>
-            <section id="progress" class="active">
-                <h2>Your Progress</h2>
-                <p>Total Score: <span id="score">0%</span></p>
-                <div class="progress-container">
-                    <div class="progress-bar" id="progressBar"></div>
-                </div>
-                <p>Tasks Completed: <span id="tasksCompleted">0/0</span></p>
-                <div id="progressDetails"></div>
-                <p id="progressTip"></p>
-                <p id="recommendation"></p>
-                <div id="achievements"></div>
-            </section>
-            <section id="homework-scores">
-                <h2>Homework Scores</h2>
-                <ul id="homeworkScores" class="scores-list">-</ul>
-            </section>
-            <section id="comprehension-scores">
-                <h2>Comprehension Scores</h2>
-                <ul id="comprehensionScores" class="scores-list">-</ul>
-            </section>
-            <section id="pronunciation-scores">
-                <h2>Pronunciation Scores</h2>
-                <ul id="pronunciationScores" class="scores-list">-</ul>
-            </section>
-            <section id="quiz-scores">
-                <h2>Quiz Scores</h2>
-                <ul id="quizScores" class="scores-list">-</ul>
-            </section>
+            <div class="breadcrumb" id="breadcrumb">Dashboard > Leaderboard</div>
             <section id="lessons">
                 <h2>Lessons</h2>
                 <select id="levelFilter">
@@ -306,9 +203,22 @@
                 <h2>Blog</h2>
                 <div id="blogList"></div>
             </section>
-            <section id="leaderboard">
+            <section id="leaderboard" class="active">
                 <h2>Leaderboard</h2>
-                <ul id="leaderboardList" class="scores-list"></ul>
+                <table class="leaderboard-table" id="leaderboardTable">
+                    <thead>
+                        <tr>
+                            <th class="position">Pos</th>
+                            <th class="name">Name</th>
+                            <th>HW</th>
+                            <th>Comp</th>
+                            <th>Pron</th>
+                            <th>Quiz</th>
+                            <th class="total-score">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody"></tbody>
+                </table>
             </section>
         </main>
         <button id="backToTop">Back to Top</button>
@@ -316,54 +226,13 @@
     <script src="/script.js"></script>
     <script>
         const stripe = Stripe('pk_test_your_stripe_publishable_key');
-
-        function updateProgressDetails(data) {
-            const totalTasks = 
-                data.lessons.filter(l => l.homework).length + 
-                data.lessons.filter(l => l.comprehension).length + 
-                data.lessons.filter(l => l.pronunciation).length + 
-                data.quizzes.length;
-
-            const homeworkCount = (data.homeworkScores || []).length;
-            const pronunciationCount = (data.pronunciationScores || []).filter(s => s.correct).length;
-            const comprehensionCount = (data.comprehensionScores || []).length;
-            const quizCount = (data.quizScores || []).length;
-            const completedTasks = homeworkCount + pronunciationCount + comprehensionCount + quizCount;
-
-            document.getElementById('score').textContent = `${data.score}%`;
-            document.getElementById('tasksCompleted').textContent = `${completedTasks}/${totalTasks}`;
-            document.getElementById('progressBar').style.width = `${data.score}%`;
-            document.getElementById('progressDetails').innerHTML = `
-                Homework: ${homeworkCount}/${data.lessons.filter(l => l.homework).length}<br>
-                Comprehension: ${comprehensionCount}/${data.lessons.filter(l => l.comprehension).length}<br>
-                Pronunciation: ${pronunciationCount}/${data.lessons.filter(l => l.pronunciation).length}<br>
-                Quizzes: ${quizCount}/${data.quizzes.length}
-            `;
-            // --- NEW: Enhanced progress tips based on task completion ---
-            document.getElementById('progressTip').textContent = completedTasks < 20 
-                ? 'Try more tasks to boost your score!' 
-                : completedTasks < 40 
-                    ? 'Halfway there—keep going for your next badge!' 
-                    : 'Amazing progress—aim for 100%!';
-            document.getElementById('recommendation').textContent = data.recommendation || '';
-            const badgeImages = {
-                'Pronunciation Pro': '/images/pronunciation-pro.webp',
-                'Blog Explorer': '/images/blog-explorer.webp',
-                'Quiz Master': '/images/quiz-master.webp'
-            };
-            document.getElementById('achievements').innerHTML = data.achievements && data.achievements.length > 0 
-                ? `<h3>Achievements</h3><ul class="badge-list">${data.achievements.map(a => `
-                    <li><img src="${badgeImages[a.name]}" alt="${a.name}" class="badge-icon"> ${a.name} (Earned: ${new Date(a.dateEarned).toLocaleDateString()})</li>
-                `).join('')}</ul>`
-                : '<p>No achievements yet—keep learning!</p>';
-        }
-
+    
         document.getElementById('logoutButton').addEventListener('click', () => {
             fetch('/api/logout', { method: 'GET' })
                 .then(response => { if (response.redirected) window.location.href = response.url; })
                 .catch(err => console.error('Logout error:', err));
         });
-
+    
         document.getElementById('donateButton').addEventListener('click', () => {
             fetch('/create-checkout-session', {
                 method: 'POST',
@@ -379,7 +248,7 @@
                 alert('Failed to initiate donation: ' + err.message);
             });
         });
-
+    
         document.querySelectorAll('.toc a').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -391,12 +260,57 @@
                     targetSection.classList.add('active');
                     link.classList.add('active');
                     document.getElementById('breadcrumb').textContent = `Dashboard > ${link.textContent}`;
-                } else {
-                    console.error('Target section not found:', targetId);
                 }
             });
         });
-
+    
+        // Function to update leaderboard without switching views
+        function updateLeaderboard(currentUser) {
+            fetch('/api/leaderboard')
+                .then(res => {
+                    if (!res.ok) throw new Error(`Failed to fetch leaderboard: ${res.status}`);
+                    return res.json();
+                })
+                .then(users => {
+                    console.log('Leaderboard received:', users);
+                    const leaderboardBody = document.getElementById('leaderboardBody');
+                    let html = '';
+    
+                    // Current user at the top
+                    html += `
+                        <tr class="current-user">
+                            <td class="position">-</td>
+                            <td class="name">${currentUser.name}</td>
+                            <td>${(currentUser.homeworkScores || []).length}</td>
+                            <td>${(currentUser.comprehensionScores || []).length}</td>
+                            <td>${(currentUser.pronunciationScores || []).filter(s => s.correct).length}</td>
+                            <td>${(currentUser.quizScores || []).length}</td>
+                            <td class="total-score">${currentUser.score}%</td>
+                        </tr>
+                    `;
+    
+                    // Ranked users, skipping current user
+                    users.forEach((user, index) => {
+                        if (user._id !== currentUser._id) {
+                            html += `
+                                <tr>
+                                    <td class="position">${index + 1}</td>
+                                    <td class="name">${user.name}</td>
+                                    <td>${(user.homeworkScores || []).length}</td>
+                                    <td>${(user.comprehensionScores || []).length}</td>
+                                    <td>${(user.pronunciationScores || []).filter(s => s.correct).length}</td>
+                                    <td>${(user.quizScores || []).length}</td>
+                                    <td class="total-score">${user.score}%</td>
+                                </tr>
+                            `;
+                        }
+                    });
+    
+                    leaderboardBody.innerHTML = html || '<tr><td colspan="7">No users ranked yet</td></tr>';
+                })
+                .catch(err => console.error('Error loading leaderboard:', err));
+        }
+    
         fetch('/api/user-data')
             .then(res => {
                 if (!res.ok) {
@@ -408,29 +322,14 @@
                 }
                 return res.json();
             })
-            .then(data => {
-                console.log('User data received:', data);
-                document.getElementById('username').textContent = data.name || 'User';
-                document.getElementById('homeworkScores').innerHTML = data.homeworkScores && data.homeworkScores.length > 0 
-                    ? data.homeworkScores.map(s => `<li>${s.title || 'Unknown Lesson'}: ${s.score}%</li>`).join('')
-                    : '<li>No homework submitted</li>';
-                document.getElementById('comprehensionScores').innerHTML = data.comprehensionScores && data.comprehensionScores.length > 0 
-                    ? data.comprehensionScores.map(s => `<li>${s.title || 'Unknown Lesson'}: ${s.score}%</li>`).join('')
-                    : '<li>No comprehension submitted</li>';
-                document.getElementById('pronunciationScores').innerHTML = data.pronunciationScores && data.pronunciationScores.length > 0 
-                    ? data.pronunciationScores.map(s => `<li>${s.phrase}: ${s.correct ? 'Correct' : 'Incorrect'} (Attempts: ${s.attempts})</li>`).join('')
-                    : '<li>No pronunciations attempted</li>';
-                document.getElementById('quizScores').innerHTML = data.quizScores && data.quizScores.length > 0 
-                    ? data.quizScores.map(s => `<li>${s.title || 'Unknown Quiz'}: ${s.score}%</li>`).join('')
-                    : '<li>No quizzes completed</li>';
-                updateProgressDetails(data);
-
-                // --- NEW: One-time welcome message on first login ---
-                if (!localStorage.getItem('welcomeShown')) {
-                    alert(`Welcome, ${data.name || 'Learner'}! Start your English journey with us!`);
-                    localStorage.setItem('welcomeShown', 'true');
-                }
-
+            .then(currentUser => {
+                console.log('Current user data:', currentUser);
+                document.getElementById('username').textContent = currentUser.name || 'User';
+    
+                // Initial Leaderboard Load
+                updateLeaderboard(currentUser);
+    
+                // Load Lessons and Jump to Lesson
                 let allLessons = [];
                 fetch('/api/lessons')
                     .then(res => {
@@ -443,7 +342,7 @@
                         const lessonList = document.getElementById('lessonList');
                         const lessonJump = document.getElementById('lessonJump');
                         const levelFilter = document.getElementById('levelFilter');
-
+    
                         function renderLessons(filterLevel) {
                             lessonList.innerHTML = `
                                 ${allLessons.filter(lesson => !filterLevel || lesson.level === filterLevel).map(lesson => `
@@ -493,8 +392,12 @@
                                     </details>
                                 `).join('')}
                             `;
+                            // Attach handlers after rendering
+                            attachHomeworkHandler();
+                            attachComprehensionHandler();
+                            attachRecordHandler();
                         }
-
+    
                         renderLessons('');
                         lessons.forEach(lesson => {
                             const option = document.createElement('option');
@@ -510,240 +413,107 @@
                                 document.querySelectorAll('.toc a').forEach(a => a.classList.remove('active'));
                                 document.getElementById('lessons').classList.add('active');
                                 document.querySelector('.toc a[href="#lessons"]').classList.add('active');
+                                document.getElementById('breadcrumb').textContent = `Dashboard > Lessons > ${target.querySelector('summary').textContent}`;
                                 target.scrollIntoView({ behavior: 'smooth' });
                                 target.open = true;
-                                document.getElementById('breadcrumb').textContent = `Dashboard > Lessons > ${target.querySelector('summary').textContent}`;
                             }
                             e.target.value = '';
                         });
                         levelFilter.addEventListener('change', (e) => renderLessons(e.target.value));
-
-                        fetch('/api/references')
-                            .then(res => {
-                                if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
-                                return res.json();
-                            })
-                            .then(references => {
-                                console.log('References received:', references);
-                                document.getElementById('referenceList').innerHTML = references.length > 0 
-                                    ? references.map(ref => `
-                                        <li>
-                                            <input type="checkbox" class="refCheckbox" data-id="${ref._id}" ${data.referencesVisited && data.referencesVisited.includes(ref._id) ? 'checked' : ''}>
-                                            <a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}
-                                        </li>
-                                    `).join('')
-                                    : '<li>No references available</li>';
-                            })
-                            .catch(err => console.error('Error loading references:', err));
-
-                        fetch('/api/blogs')
-                            .then(res => {
-                                if (!res.ok) throw new Error(`Failed to fetch blogs: ${res.status}`);
-                                return res.json();
-                            })
-                            .then(blogs => {
-                                console.log('Blogs received:', blogs);
-                                document.getElementById('blogList').innerHTML = `
-                                    ${blogs.map(blog => `
-                                        <details class="blog-post">
-                                            <summary>${blog.title}</summary>
-                                            <p>${blog.content}</p>
-                                            <small>Posted on: ${new Date(blog.createdAt).toLocaleDateString()}</small>
-                                        </details>
-                                    `).join('')}
-                                `;
-                            })
-                            .catch(err => console.error('Error loading blogs:', err));
-
-                        fetch('/api/leaderboard')
-                            .then(res => {
-                                if (!res.ok) throw new Error(`Failed to fetch leaderboard: ${res.status}`);
-                                return res.json();
-                            })
-                            .then(users => {
-                                console.log('Leaderboard received:', users);
-                                document.getElementById('leaderboardList').innerHTML = users.length > 0 
-                                    ? users.map((user, index) => `
-                                        <li>${index + 1}. ${user.name}: ${user.score}%</li>
-                                    `).join('')
-                                    : '<li>No users ranked yet</li>';
-                            })
-                            .catch(err => console.error('Error loading leaderboard:', err));
-
-                        fetch('/api/quizzes')
-                            .then(res => {
-                                if (!res.ok) throw new Error(`Failed to fetch quizzes: ${res.status}`);
-                                return res.json();
-                            })
-                            .then(quizzes => {
-                                console.log('Quizzes received:', quizzes);
-                                document.getElementById('quizList').innerHTML = `
-                                    ${quizzes.map(quiz => `
-                                        <div class="quiz" data-id="${quiz._id}">
-                                            <h3>${quiz.title} (${quiz.level})</h3>
-                                            <p>Time Limit: ${quiz.timeLimit} seconds</p>
-                                            <button class="startQuiz" data-id="${quiz._id}">Start Quiz</button>
-                                            <div class="quizContent" style="display: none;"></div>
-                                        </div>
-                                    `).join('')}
-                                `;
-                                document.querySelectorAll('.startQuiz').forEach(button => {
-                                    button.addEventListener('click', () => {
-                                        const quizId = button.dataset.id;
-                                        const quiz = quizzes.find(q => q._id === quizId);
-                                        const quizContent = button.nextElementSibling;
-                                        quizContent.style.display = 'block';
-                                        button.style.display = 'none';
-                                        let timeLeft = quiz.timeLimit;
-                                        quizContent.innerHTML = `
-                                            <p>Time Remaining: <span id="timer-${quizId}">${timeLeft}</span> seconds</p>
-                                            <form class="quizForm" data-id="${quizId}">
-                                                ${quiz.type === 'matching' ? `
-                                                    ${quiz.questions.map((q, i) => `
-                                                        <p>${q.prompt}</p>
-                                                        <select name="answer${i}" required>
-                                                            ${quiz.questions.map(opt => `<option value="${opt.correctAnswer}">${opt.correctAnswer}</option>`).join('')}
-                                                        </select>
-                                                    `).join('')}
-                                                ` : `
-                                                    ${quiz.questions.map((q, i) => `
-                                                        <p>${q.prompt}</p>
-                                                        <input type="text" name="answer${i}" required>
-                                                    `).join('')}
-                                                `}
-                                                <button type="submit">Submit Quiz</button>
-                                            </form>
-                                        `;
-                                        const timer = setInterval(() => {
-                                            timeLeft--;
-                                            document.getElementById(`timer-${quizId}`).textContent = timeLeft;
-                                            if (timeLeft <= 0) {
-                                                clearInterval(timer);
-                                                document.querySelector(`form[data-id="${quizId}"]`).dispatchEvent(new Event('submit'));
-                                            }
-                                        }, 1000);
-
-                                        document.querySelector(`form[data-id="${quizId}"]`).addEventListener('submit', async (e) => {
-                                            e.preventDefault();
-                                            clearInterval(timer);
-                                            const answers = Array.from(e.target.querySelectorAll('select, input')).map(input => input.value);
-                                            try {
-                                                const response = await fetch('/api/submit-quiz', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ quizId, answers })
-                                                });
-                                                if (!response.ok) {
-                                                    const errorText = await response.text();
-                                                    throw new Error(`Quiz submission failed: ${response.status} - ${errorText}`);
-                                                }
-                                                const result = await response.json();
-                                                console.log('Quiz result:', result);
-                                                const percentage = Math.round((result.score / result.total) * 100);
-                                                let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
-                                                result.feedback.forEach(f => {
-                                                    feedback += `${f.prompt}: ${f.correct ? 'Correct!' : `Wrong, answer: ${f.correctAnswer}`}\n`;
-                                                });
-                                                alert(feedback);
-                                                fetch('/api/user-data').then(res => res.json()).then(updateData => {
-                                                    document.getElementById('quizScores').innerHTML = updateData.quizScores.map(s => `<li>${s.title || 'Unknown Quiz'}: ${s.score}%</li>`).join('');
-                                                    updateProgressDetails(updateData);
-                                                });
-                                                quizContent.style.display = 'none';
-                                                button.style.display = 'block';
-                                            } catch (err) {
-                                                console.error('Quiz fetch error:', err.message);
-                                                alert('Failed to submit quiz: ' + err.message);
-                                                if (err.message.includes('401')) window.location.href = '/index.html';
-                                            }
+    
+                        // Homework Submission Handler
+                        function attachHomeworkHandler() {
+                            document.querySelectorAll('.homeworkForm').forEach(form => {
+                                form.addEventListener('submit', async (e) => {
+                                    e.preventDefault();
+                                    const lessonId = form.dataset.lessonId;
+                                    const answers = Array.from(form.querySelectorAll('input, select')).map(input => input.value);
+                                    console.log('Submitting homework:', { lessonId, answers });
+                                    try {
+                                        const response = await fetch('/api/homework', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ lessonId, answers })
                                         });
-                                    });
+                                        if (!response.ok) {
+                                            const errorText = await response.text();
+                                            throw new Error(`Homework submission failed: ${response.status} - ${errorText}`);
+                                        }
+                                        const result = await response.json();
+                                        console.log('Homework result:', result);
+                                        const percentage = Math.round((result.score / result.total) * 100);
+                                        let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
+                                        result.feedback.forEach(f => {
+                                            feedback += `${f.question}: ${f.correct ? 'Correct!' : `Wrong, try: ${f.correctAnswer}`}\n`;
+                                        });
+                                        alert(feedback);
+                                        document.getElementById('lessons').classList.add('active');
+                                        document.querySelector('.toc a[href="#lessons"]').classList.add('active');
+                                        document.getElementById('breadcrumb').textContent = `Dashboard > Lessons`;
+                                        fetch('/api/user-data').then(res => res.json()).then(updateData => {
+                                            updateLeaderboard(updateData);
+                                        });
+                                    } catch (err) {
+                                        console.error('Homework fetch error:', err.message);
+                                        alert('Failed to submit homework: ' + err.message);
+                                        if (err.message.includes('401')) window.location.href = '/index.html';
+                                    }
                                 });
-                            })
-                            .catch(err => console.error('Error loading quizzes:', err));
-
-                        document.querySelectorAll('.homeworkForm').forEach(form => {
-                            form.addEventListener('submit', async (e) => {
-                                e.preventDefault();
-                                const lessonId = form.dataset.lessonId;
-                                const answers = Array.from(form.querySelectorAll('input, select')).map(input => input.value);
-                                console.log('Submitting homework:', { lessonId, answers });
-                                try {
-                                    const response = await fetch('/api/homework', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ lessonId, answers })
-                                    });
-                                    if (!response.ok) {
-                                        const errorText = await response.text();
-                                        throw new Error(`Homework submission failed: ${response.status} - ${errorText}`);
-                                    }
-                                    const result = await response.json();
-                                    console.log('Homework result:', result);
-                                    const percentage = Math.round((result.score / result.total) * 100);
-                                    let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
-                                    result.feedback.forEach(f => {
-                                        feedback += `${f.question}: ${f.correct ? 'Correct!' : `Wrong, try: ${f.correctAnswer}`}\n`;
-                                    });
-                                    alert(feedback);
-                                    fetch('/api/user-data').then(res => res.json()).then(updateData => {
-                                        document.getElementById('homeworkScores').innerHTML = updateData.homeworkScores.map(s => `<li>${s.title || 'Unknown Lesson'}: ${s.score}%</li>`).join('');
-                                        updateProgressDetails(updateData);
-                                    });
-                                } catch (err) {
-                                    console.error('Homework fetch error:', err.message);
-                                    alert('Failed to submit homework: ' + err.message);
-                                    if (err.message.includes('401')) window.location.href = '/index.html';
-                                }
                             });
-                        });
-
-                        document.querySelectorAll('.comprehensionForm').forEach(form => {
-                            form.addEventListener('submit', async (e) => {
-                                e.preventDefault();
-                                const lessonId = form.dataset.lessonId;
-                                const answers = Array.from(form.querySelectorAll('input:checked')).map(input => input.value === 'true');
-                                console.log('Submitting comprehension:', { lessonId, answers });
-                                try {
-                                    const response = await fetch('/api/comprehension', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ lessonId, answers })
-                                    });
-                                    if (!response.ok) {
-                                        const errorText = await response.text();
-                                        throw new Error(`Comprehension submission failed: ${response.status} - ${errorText}`);
+                        }
+    
+                        // Comprehension Submission Handler
+                        function attachComprehensionHandler() {
+                            document.querySelectorAll('.comprehensionForm').forEach(form => {
+                                form.addEventListener('submit', async (e) => {
+                                    e.preventDefault();
+                                    const lessonId = form.dataset.lessonId;
+                                    const answers = Array.from(form.querySelectorAll('input:checked')).map(input => input.value === 'true');
+                                    console.log('Submitting comprehension:', { lessonId, answers });
+                                    try {
+                                        const response = await fetch('/api/comprehension', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ lessonId, answers })
+                                        });
+                                        if (!response.ok) {
+                                            const errorText = await response.text();
+                                            throw new Error(`Comprehension submission failed: ${response.status} - ${errorText}`);
+                                        }
+                                        const result = await response.json();
+                                        console.log('Comprehension result:', result);
+                                        const percentage = Math.round((result.score / result.total) * 100);
+                                        let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
+                                        result.feedback.forEach(f => {
+                                            feedback += `${f.question}: ${f.correct ? 'Correct!' : `Wrong, answer: ${f.correctAnswer ? 'Yes/True' : 'No/False'}`}\n`;
+                                        });
+                                        alert(feedback);
+                                        document.getElementById('lessons').classList.add('active');
+                                        document.querySelector('.toc a[href="#lessons"]').classList.add('active');
+                                        document.getElementById('breadcrumb').textContent = `Dashboard > Lessons`;
+                                        fetch('/api/user-data').then(res => res.json()).then(updateData => {
+                                            updateLeaderboard(updateData);
+                                        });
+                                    } catch (err) {
+                                        console.error('Comprehension fetch error:', err.message);
+                                        alert('Failed to submit comprehension: ' + err.message);
+                                        if (err.message.includes('401')) window.location.href = '/index.html';
                                     }
-                                    const result = await response.json();
-                                    console.log('Comprehension result:', result);
-                                    const percentage = Math.round((result.score / result.total) * 100);
-                                    let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
-                                    result.feedback.forEach(f => {
-                                        feedback += `${f.question}: ${f.correct ? 'Correct!' : `Wrong, answer: ${f.correctAnswer ? 'Yes/True' : 'No/False'}`}\n`;
-                                    });
-                                    alert(feedback);
-                                    fetch('/api/user-data').then(res => res.json()).then(updateData => {
-                                        document.getElementById('comprehensionScores').innerHTML = updateData.comprehensionScores.map(s => `<li>${s.title || 'Unknown Lesson'}: ${s.score}%</li>`).join('');
-                                        updateProgressDetails(updateData);
-                                    });
-                                } catch (err) {
-                                    console.error('Comprehension fetch error:', err.message);
-                                    alert('Failed to submit comprehension: ' + err.message);
-                                    if (err.message.includes('401')) window.location.href = '/index.html';
-                                }
+                                });
                             });
-                        });
-
+                        }
+    
+                        // Pronunciation Handler
                         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
                         recognition.lang = 'en-US';
                         recognition.interimResults = false;
                         recognition.maxAlternatives = 1;
                         let isRecognizing = false;
-
+    
                         function normalizeText(text) {
                             return text.toLowerCase().trim().replace(/’/g, "'");
                         }
-
+    
                         function levenshteinDistance(a, b) {
                             const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
                             for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
@@ -760,103 +530,228 @@
                             }
                             return matrix[b.length][a.length];
                         }
-
-                        document.querySelectorAll('.recordButton').forEach(button => {
-                            button.addEventListener('click', () => {
-                                if (isRecognizing) {
-                                    console.log('Already recognizing, please wait...');
-                                    return;
-                                }
-                                const phrase = button.dataset.phrase;
-                                const lessonId = button.dataset.lessonId;
-                                const resultId = button.dataset.resultId;
-                                const resultSpan = document.getElementById(resultId);
-
-                                console.log('Starting recognition for:', phrase);
-                                recognition.start();
-                                isRecognizing = true;
-                                button.disabled = true;
-                                resultSpan.textContent = 'Listening...';
-
-                                recognition.onresult = (event) => {
-                                    const spokenText = normalizeText(event.results[0][0].transcript);
-                                    const expectedText = normalizeText(phrase);
-                                    console.log('Heard:', spokenText, 'Expected:', expectedText);
-                                    const isCorrect = spokenText === expectedText || levenshteinDistance(spokenText, expectedText) <= 2;
-                                    resultSpan.textContent = isCorrect ? 'Correct!' : `Try again: heard "${spokenText}"`;
-                                    isRecognizing = false;
-                                    button.disabled = false;
-
-                                    fetch('/api/pronunciation', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ lessonId, phrase, isCorrect })
-                                    })
-                                    .then(res => {
-                                        if (!res.ok) {
-                                            return res.text().then(text => { throw new Error(`Pronunciation save failed: ${res.status} - ${text}`); });
-                                        }
-                                        return res.text();
-                                    })
-                                    .then(text => {
-                                        console.log('Pronunciation saved successfully:', text);
-                                        fetch('/api/user-data').then(res => res.json()).then(updateData => {
-                                            document.getElementById('pronunciationScores').innerHTML = updateData.pronunciationScores.map(s => `<li>${s.phrase}: ${s.correct ? 'Correct' : 'Incorrect'} (Attempts: ${s.attempts})</li>`).join('');
-                                            updateProgressDetails(updateData);
-                                        });
-                                    })
-                                    .catch(err => {
-                                        console.error('Pronunciation save error:', err.message);
-                                        alert('Failed to save pronunciation: ' + err.message);
-                                        if (err.message.includes('401')) window.location.href = '/index.html';
-                                    });
-                                };
-
-                                recognition.onerror = (event) => {
-                                    console.error('Recognition error:', event.error);
-                                    resultSpan.textContent = `Error: ${event.error}${event.error === 'network' ? ' - Check internet connection' : ''}`;
-                                    isRecognizing = false;
-                                    button.disabled = false;
-                                };
-
-                                recognition.onend = () => {
-                                    console.log('Recognition ended');
-                                    if (!resultSpan.textContent || resultSpan.textContent === 'Listening...') {
-                                        resultSpan.textContent = 'No speech detected';
+    
+                        function attachRecordHandler() {
+                            document.querySelectorAll('.recordButton').forEach(button => {
+                                button.addEventListener('click', () => {
+                                    if (isRecognizing) {
+                                        console.log('Already recognizing, please wait...');
+                                        return;
                                     }
-                                    isRecognizing = false;
-                                    button.disabled = false;
-                                };
+                                    const phrase = button.dataset.phrase;
+                                    const lessonId = button.dataset.lessonId;
+                                    const resultId = button.dataset.resultId;
+                                    const resultSpan = document.getElementById(resultId);
+    
+                                    console.log('Starting recognition for:', phrase);
+                                    recognition.start();
+                                    isRecognizing = true;
+                                    button.disabled = true;
+                                    resultSpan.textContent = 'Listening...';
+    
+                                    recognition.onresult = (event) => {
+                                        const spokenText = normalizeText(event.results[0][0].transcript);
+                                        const expectedText = normalizeText(phrase);
+                                        console.log('Heard:', spokenText, 'Expected:', expectedText);
+                                        const isCorrect = spokenText === expectedText || levenshteinDistance(spokenText, expectedText) <= 2;
+                                        resultSpan.textContent = isCorrect ? 'Correct!' : `Try again: heard "${spokenText}"`;
+                                        isRecognizing = false;
+                                        button.disabled = false;
+    
+                                        fetch('/api/pronunciation', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ lessonId, phrase, isCorrect })
+                                        })
+                                        .then(res => {
+                                            if (!res.ok) {
+                                                return res.text().then(text => { throw new Error(`Pronunciation save failed: ${res.status} - ${text}`); });
+                                            }
+                                            return res.text();
+                                        })
+                                        .then(text => {
+                                            console.log('Pronunciation saved:', text);
+                                            fetch('/api/user-data').then(res => res.json()).then(updateData => {
+                                                updateLeaderboard(updateData);
+                                            });
+                                        })
+                                        .catch(err => {
+                                            console.error('Pronunciation save error:', err.message);
+                                            alert('Failed to save pronunciation: ' + err.message);
+                                            if (err.message.includes('401')) window.location.href = '/index.html';
+                                        });
+                                    };
+    
+                                    recognition.onerror = (event) => {
+                                        console.error('Recognition error:', event.error);
+                                        resultSpan.textContent = `Error: ${event.error}${event.error === 'network' ? ' - Check internet' : ''}`;
+                                        isRecognizing = false;
+                                        button.disabled = false;
+                                    };
+    
+                                    recognition.onend = () => {
+                                        console.log('Recognition ended');
+                                        if (!resultSpan.textContent || resultSpan.textContent === 'Listening...') {
+                                            resultSpan.textContent = 'No speech detected';
+                                        }
+                                        isRecognizing = false;
+                                        button.disabled = false;
+                                    };
+                                });
                             });
-                        });
-
-                        document.querySelectorAll('.lesson summary').forEach(summary => {
-                            summary.addEventListener('click', () => {
-                                const lessonTitle = summary.textContent;
-                                document.getElementById('breadcrumb').textContent = `Dashboard > Lessons > ${lessonTitle}`;
-                            });
-                        });
-
-                        document.querySelectorAll('.blog-post summary').forEach(summary => {
-                            summary.addEventListener('click', () => {
-                                const blogTitle = summary.textContent;
-                                document.getElementById('breadcrumb').textContent = `Dashboard > Blog > ${blogTitle}`;
+                        }
+                    })
+                    .catch(err => console.error('Error loading lessons:', err));
+    
+                // Load Quizzes
+                fetch('/api/quizzes')
+                    .then(res => {
+                        if (!res.ok) throw new Error(`Failed to fetch quizzes: ${res.status}`);
+                        return res.json();
+                    })
+                    .then(quizzes => {
+                        console.log('Quizzes received:', quizzes);
+                        document.getElementById('quizList').innerHTML = `
+                            ${quizzes.map(quiz => `
+                                <div class="quiz" data-id="${quiz._id}">
+                                    <h3>${quiz.title} (${quiz.level})</h3>
+                                    <p>Time Limit: ${quiz.timeLimit} seconds</p>
+                                    <button class="startQuiz" data-id="${quiz._id}">Start Quiz</button>
+                                    <div class="quizContent" style="display: none;"></div>
+                                </div>
+                            `).join('')}
+                        `;
+    
+                        document.querySelectorAll('.startQuiz').forEach(button => {
+                            button.addEventListener('click', () => {
+                                const quizId = button.dataset.id;
+                                const quiz = quizzes.find(q => q._id === quizId);
+                                const quizContent = button.nextElementSibling;
+                                quizContent.style.display = 'block';
+                                button.style.display = 'none';
+                                let timeLeft = quiz.timeLimit;
+                                quizContent.innerHTML = `
+                                    <p>Time Remaining: <span id="timer-${quizId}">${timeLeft}</span> seconds</p>
+                                    <form class="quizForm" data-id="${quizId}">
+                                        ${quiz.type === 'matching' ? `
+                                            ${quiz.questions.map((q, i) => `
+                                                <p>${q.prompt}</p>
+                                                <select name="answer${i}" required>
+                                                    ${quiz.questions.map(opt => `<option value="${opt.correctAnswer}">${opt.correctAnswer}</option>`).join('')}
+                                                </select>
+                                            `).join('')}
+                                        ` : `
+                                            ${quiz.questions.map((q, i) => `
+                                                <p>${q.prompt}</p>
+                                                <input type="text" name="answer${i}" required>
+                                            `).join('')}
+                                        `}
+                                        <button type="submit">Submit Quiz</button>
+                                    </form>
+                                `;
+                                const timer = setInterval(() => {
+                                    timeLeft--;
+                                    document.getElementById(`timer-${quizId}`).textContent = timeLeft;
+                                    if (timeLeft <= 0) {
+                                        clearInterval(timer);
+                                        document.querySelector(`form[data-id="${quizId}"]`).dispatchEvent(new Event('submit'));
+                                    }
+                                }, 1000);
+    
+                                document.querySelector(`form[data-id="${quizId}"]`).addEventListener('submit', async (e) => {
+                                    e.preventDefault();
+                                    clearInterval(timer);
+                                    const answers = Array.from(e.target.querySelectorAll('select, input')).map(input => input.value);
+                                    try {
+                                        const response = await fetch('/api/submit-quiz', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ quizId, answers })
+                                        });
+                                        if (!response.ok) {
+                                            const errorText = await response.text();
+                                            throw new Error(`Quiz submission failed: ${response.status} - ${errorText}`);
+                                        }
+                                        const result = await response.json();
+                                        console.log('Quiz result:', result);
+                                        const percentage = Math.round((result.score / result.total) * 100);
+                                        let feedback = `Score: ${percentage}% (${result.score}/${result.total} correct)\n`;
+                                        result.feedback.forEach(f => {
+                                            feedback += `${f.prompt}: ${f.correct ? 'Correct!' : `Wrong, answer: ${f.correctAnswer}`}\n`;
+                                        });
+                                        alert(feedback);
+                                        fetch('/api/user-data').then(res => res.json()).then(updateData => {
+                                            updateLeaderboard(updateData);
+                                        });
+                                        quizContent.style.display = 'none';
+                                        button.style.display = 'block';
+                                    } catch (err) {
+                                        console.error('Quiz fetch error:', err.message);
+                                        alert('Failed to submit quiz: ' + err.message);
+                                        if (err.message.includes('401')) window.location.href = '/index.html';
+                                    }
+                                });
                             });
                         });
                     })
-                    .catch(err => console.error('Error loading lessons:', err));
-                const backToTop = document.getElementById('backToTop');
-                document.querySelector('.content').addEventListener('scroll', () => {
-                    backToTop.style.display = document.querySelector('.content').scrollTop > 300 ? 'block' : 'none';
-                });
-                backToTop.addEventListener('click', () => {
-                    document.querySelector('.content').scrollTo({ top: 0, behavior: 'smooth' });
-                });
+                    .catch(err => console.error('Error loading quizzes:', err));
+    
+                // Load References
+                fetch('/api/references')
+                    .then(res => {
+                        if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
+                        return res.json();
+                    })
+                    .then(references => {
+                        console.log('References received:', references);
+                        document.getElementById('referenceList').innerHTML = references.length > 0 
+                            ? references.map(ref => `
+                                <li>
+                                    <input type="checkbox" class="refCheckbox" data-id="${ref._id}" ${currentUser.referencesVisited && currentUser.referencesVisited.includes(ref._id) ? 'checked' : ''}>
+                                    <a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}
+                                </li>
+                            `).join('')
+                            : '<li>No references available</li>';
+                    })
+                    .catch(err => console.error('Error loading references:', err));
+    
+                // Load Blog
+                fetch('/api/blogs')
+                    .then(res => {
+                        if (!res.ok) throw new Error(`Failed to fetch blogs: ${res.status}`);
+                        return res.json();
+                    })
+                    .then(blogs => {
+                        console.log('Blogs received:', blogs);
+                        document.getElementById('blogList').innerHTML = `
+                            ${blogs.map(blog => `
+                                <details class="blog-post">
+                                    <summary>${blog.title}</summary>
+                                    <p>${blog.content}</p>
+                                    <small>Posted on: ${new Date(blog.createdAt).toLocaleDateString()}</small>
+                                </details>
+                            `).join('')}
+                        `;
+                    })
+                    .catch(err => console.error('Error loading blogs:', err));
+    
+                if (!localStorage.getItem('welcomeShown')) {
+                    alert(`Welcome, ${currentUser.name || 'Learner'}! Check your progress on the leaderboard!`);
+                    localStorage.setItem('welcomeShown', 'true');
+                }
             })
             .catch(err => {
                 console.error('Dashboard fetch error:', err.message);
                 if (err.message.includes('401')) window.location.href = '/index.html';
             });
+    
+        const backToTop = document.getElementById('backToTop');
+        document.querySelector('.content').addEventListener('scroll', () => {
+            backToTop.style.display = document.querySelector('.content').scrollTop > 300 ? 'block' : 'none';
+        });
+        backToTop.addEventListener('click', () => {
+            document.querySelector('.content').scrollTo({ top: 0, behavior: 'smooth' });
+        });
     </script>
 </body>
 </html>
