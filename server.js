@@ -670,7 +670,7 @@ require('dotenv').config(); // If not already there
 const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN); // Free token from Hugging Face
 
 // Simple CEFR mapping function
-const { HfInference } = require('@huggingface/inference');
+
 
 // Simple CEFR mapping function
 function mapToCEFR(score, wordCount) {
@@ -686,7 +686,7 @@ app.post('/api/grade-writing', async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'No text provided' });
 
-    const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN);
+    
     if (!process.env.HUGGINGFACE_API_TOKEN) {
         console.error('HUGGINGFACE_API_TOKEN is not set');
         return res.status(500).json({ error: 'Server configuration error: Missing API token' });
