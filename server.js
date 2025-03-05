@@ -27,8 +27,8 @@ const transporter = nodemailer.createTransport({
     port: 587,
     secure: false,
     auth: {
-        user: process.env.MAILTRAP_USER, // e.g., '1a2b3c4d5e6f7g8h' from Mailtrap
-        pass: process.env.MAILTRAP_PASS,  // e.g., '9i8h7g6f5e4d3c2b' from Mailtrap
+        user: process.env.EMAIL_USER, // e.g., '1a2b3c4d5e6f7g8h' from Mailtrap
+        pass: process.env.EMAIL_PASS,  // e.g., '9i8h7g6f5e4d3c2b' from Mailtrap
     }
 });
 
