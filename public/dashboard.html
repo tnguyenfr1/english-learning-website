@@ -156,6 +156,58 @@
             background: #e6f3ff; /* Light blue highlight for current user */
             font-weight: 700;
         }
+
+        /* Lesson Styling */
+.lesson {
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    margin: 10px 0;
+    padding: 15px;
+    transition: background 0.3s;
+}
+.lesson:hover {
+    background: #f5f5f5;
+}
+.lesson summary {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 400; /* Non-bold, elegant */
+    font-size: 16px;
+    color: #2c3e50;
+    cursor: pointer;
+    padding: 0;
+    background: none;
+    list-style: none;
+    -webkit-font-smoothing: antialiased; /* Apple-like smoothness */
+    -moz-osx-font-smoothing: grayscale;
+}
+.lesson summary::-webkit-details-marker {
+    display: none;
+}
+.lesson summary::marker {
+    display: none;
+}
+.lesson-content {
+    padding: 15px 0 0;
+    margin-top: 10px;
+}
+.lesson-content h3, .lesson-content h4 {
+    color: #2980b9;
+    margin: 10px 0;
+}
+.lesson-content form {
+    margin: 10px 0;
+}
+.lesson-content button {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.lesson-content button:hover {
+    background: #2980b9;
+}
     </style>
 </head>
 <body>
