@@ -23,8 +23,9 @@ const clientOptions = {
 // --- NEW: Nodemailer setup with Mailtrap credentials ---
 // Replace these with your Mailtrap SMTP details from mailtrap.io
 const transporter = nodemailer.createTransport({
-    host: 'sandbox.smtp.mailtrap.io',
+    host: 'smtp.gmail.com',
     port: 587,
+    secure: false,
     auth: {
         user: process.env.MAILTRAP_USER, // e.g., '1a2b3c4d5e6f7g8h' from Mailtrap
         pass: process.env.MAILTRAP_PASS,  // e.g., '9i8h7g6f5e4d3c2b' from Mailtrap
