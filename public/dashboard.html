@@ -251,9 +251,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
-.refCheckbox {
-    margin-right: 10px;
-}
+
     </style>
 </head>
 <body>
@@ -795,24 +793,23 @@
                     .catch(err => console.error('Error loading quizzes:', err));
     
                 // Load References
-                fetch('/api/references')
-                    .then(res => {
-                        if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
-                        return res.json();
-                    })
-                    .then(references => {
-                        console.log('References received:', references);
-                        document.getElementById('referenceList').innerHTML = references.length > 0 
-                            ? references.map(ref => `
-                                <li>
-                                    <input type="checkbox" class="refCheckbox" data-id="${ref._id}" ${currentUser.referencesVisited && currentUser.referencesVisited.includes(ref._id) ? 'checked' : ''}>
-                                    <a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}
-                                </li>
-                            `).join('')
-                            : '<li>No references available</li>';
-                    })
-                    .catch(err => console.error('Error loading references:', err));
-    
+                // Load References
+fetch('/api/references')
+    .then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
+        return res.json();
+    })
+    .then(references => {
+        console.log('References received:', references);
+        document.getElementById('referenceList').innerHTML = references.length > 0 
+            ? references.map(ref => `
+                <li>
+                    <a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}
+                </li>
+            `).join('')
+            : '<li>No references available</li>';
+    })
+    .catch(err => console.error('Error loading references:', err));
                 // Load Blog
                 fetch('/api/blogs')
                     .then(res => {
