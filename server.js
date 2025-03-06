@@ -667,7 +667,7 @@ app.post('/api/pronunciation', async (req, res) => {
 
 require('dotenv').config(); // If not already there
 
-const languageTool = require('languagetool-api'); // Rename to avoid confusion
+const languageTool = require('languagetool-api');
 
 function mapToCEFR(score, wordCount) {
     if (score < 20 || wordCount < 20) return { level: 'A1', reason: 'Basic vocabulary and structure, many errors' };
@@ -686,12 +686,15 @@ app.post('/api/grade-writing', async (req, res) => {
         console.log('Grading text:', text);
 
         // Grammar (LanguageTool)
-        const grammarCheck = await languageTool.check({
-            text,
+        const grammarResult = await languageTool.check({
+            text: text,
             language: 'en-US',
-            apiUrl: 'https://api.languagetool.org/v2' // Explicit public API URL
+            url: 'https://api.languagetool.org/v2/check' // Explicit endpoint
         });
-        console.log('Grammar check:', grammarCheck.matches);
+        console.log('Raw grammar result:', grammarResult);
+
+        // Handle response safely
+        const grammarCheck = grammarResult && grammarResult.matches ? grammarResult : { matches: [] };
         const errorCount = grammarCheck.matches.length;
         let grammarScore = 100 - (errorCount * 10); // 10 points off per error
         grammarScore = Math.max(0, grammarScore);
