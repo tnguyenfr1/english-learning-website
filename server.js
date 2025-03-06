@@ -693,7 +693,7 @@ app.post('/api/grade-writing', async (req, res) => {
             enabledOnly: 'false'
         }, {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            timeout: 8000 // 8s timeout
+            timeout: 8000
         });
         console.log('Raw grammar result:', JSON.stringify(ltResponse.data, null, 2));
 
@@ -720,7 +720,7 @@ app.post('/api/grade-writing', async (req, res) => {
         const feedback = `
             Your writing has ${wordCount} words and ${sentenceCount} sentences. 
             ${avgWordsPerSentence < 5 ? 'Try longer sentences for complexity.' : 'Good sentence length.'}
-            ${grammarScore < 50 ? 'Check your grammar: ' + grammarFeedback : 'Solid grammar: ' + grammarFeedback}
+            ${grammarScore < 80 ? 'Check your grammar: ' + grammarFeedback : 'Solid grammar: ' + grammarFeedback}
         `;
 
         res.json({ score, cefr: cefrData.level, feedback });
