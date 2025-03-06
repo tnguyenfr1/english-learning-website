@@ -689,9 +689,11 @@ app.post('/api/grade-writing', async (req, res) => {
         const grammarResult = await languageTool.check({
             text: text,
             language: 'en-US',
-            url: 'https://api.languagetool.org/v2/check' // Explicit endpoint
+            url: 'https://api.languagetool.org/v2/check',
+            disabledRules: 'WHITESPACE_RULE', // Ignore extra spaces
+            enabledOnly: false // Ensure all rules are active
         });
-        console.log('Raw grammar result:', grammarResult);
+        console.log('Raw grammar result:', JSON.stringify(grammarResult, null, 2));
 
         // Handle response safely
         const grammarCheck = grammarResult && grammarResult.matches ? grammarResult : { matches: [] };
