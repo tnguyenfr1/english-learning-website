@@ -74,7 +74,7 @@
         h2, h3, h4 { 
             font-weight: 700; 
             margin-bottom: 20px; 
-            list-style: none; /* No bullets */
+            list-style: none; 
         }
         h2 { font-size: 28px; }
         h3 { font-size: 22px; }
@@ -106,7 +106,7 @@
             font-size: 16px; 
         }
         .lesson-list { 
-            list-style: none; /* No bullets */
+            list-style: none; 
             margin: 20px 0; 
         }
         .lesson-item { 
@@ -410,7 +410,9 @@
 
                 function attachHandlers() {
                     document.querySelectorAll('.lesson-item').forEach(item => {
-                        item.addEventListener('click', () => {
+                        const header = item.querySelector('span'); // Only toggle on title click
+                        header.addEventListener('click', (e) => {
+                            e.stopPropagation(); // Prevent bubbling to item
                             const content = item.querySelector('.lesson-content');
                             content.classList.toggle('active');
                         });
@@ -419,6 +421,7 @@
                     document.querySelectorAll('.homeworkForm').forEach(form => {
                         form.addEventListener('submit', async (e) => {
                             e.preventDefault();
+                            e.stopPropagation(); // Stop bubbling to lesson-item
                             const lessonId = form.dataset.lessonId;
                             const answers = Array.from(form.querySelectorAll('input, select')).map(input => input.value);
                             try {
@@ -439,6 +442,7 @@
                     document.querySelectorAll('.comprehensionForm').forEach(form => {
                         form.addEventListener('submit', async (e) => {
                             e.preventDefault();
+                            e.stopPropagation(); // Stop bubbling to lesson-item
                             const lessonId = form.dataset.lessonId;
                             const answers = Array.from(form.querySelectorAll('input:checked')).map(input => input.value === 'true');
                             try {
@@ -461,7 +465,8 @@
                     let isRecognizing = false;
 
                     document.querySelectorAll('.recordButton').forEach(button => {
-                        button.addEventListener('click', () => {
+                        button.addEventListener('click', (e) => {
+                            e.stopPropagation(); // Stop bubbling to lesson-item
                             if (isRecognizing) return;
                             const phrase = button.dataset.phrase;
                             const lessonId = button.dataset.lessonId;
