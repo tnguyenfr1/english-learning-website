@@ -179,7 +179,7 @@
             fetch('/api/lessons')
         .then(res => res.json())
         .then(lessons => {
-            console.log('Lessons fetched:', lessons); // Debug raw data
+            console.log('Lessons fetched:', lessons);
             const lessonList = document.getElementById('lessonList');
             const lessonJump = document.getElementById('lessonJump');
             const levelFilter = document.getElementById('levelFilter');
@@ -248,11 +248,11 @@
                         </li>
                     `).join('') || '<li>No lessons available</li>';
                 console.timeEnd('Render Lessons');
-                updateJumpOptions(filterLevel); // Moved up
+                updateJumpOptions(filterLevel);
                 attachHandlers();
             }
 
-            renderLessons(''); // Initial render
+            renderLessons('');
             levelFilter.addEventListener('change', (e) => {
                 const selectedLevel = e.target.value;
                 console.log('Level filter changed to:', selectedLevel);
@@ -260,16 +260,23 @@
             });
             lessonJump.addEventListener('change', (e) => {
                 const targetId = e.target.value;
-                console.log('Jumping to lesson:', targetId);
-                const target = document.getElementById(targetId);
+                console.log('Jump selected:', targetId);
+                const target = document.querySelector(`[data-id="${targetId}"]`); // Use data-id instead
                 if (target) {
                     document.querySelectorAll('.content section').forEach(s => s.classList.remove('active'));
                     document.querySelectorAll('.toc a').forEach(a => a.classList.remove('active'));
                     document.getElementById('lessons').classList.add('active');
                     document.querySelector('.toc a[href="#lessons"]').classList.add('active');
                     target.scrollIntoView({ behavior: 'smooth' });
-                    const content = document.getElementById(`content-${target.dataset.id.split('-')[1]}`);
-                    if (content) content.classList.add('active');
+                    const content = target.querySelector('.lesson-content');
+                    if (content) {
+                        console.log('Toggling content for:', content.id);
+                        content.classList.add('active');
+                    } else {
+                        console.error('No content found for:', targetId);
+                    }
+                } else {
+                    console.error('Target not found:', targetId);
                 }
                 e.target.value = '';
             });
@@ -360,7 +367,7 @@
 
                 document.querySelectorAll('.recordButton').forEach(button => {
                     button.removeEventListener('click', button._clickHandler);
-                    const clickHandler = (e) => {
+                    const clickHandler = async (e) => {
                         e.stopPropagation();
                         if (isRecognizing || !recognition) return;
                         const phrase = button.dataset.phrase;
@@ -378,11 +385,17 @@
                             resultSpan.textContent = isCorrect ? 'Correct!' : `Try again: "${spokenText}"`;
                             isRecognizing = false;
                             button.disabled = false;
-                            await fetch('/api/pronunciation', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ lessonId, phrase, isCorrect })
-                            });
+                            try {
+                                const res = await fetch('/api/pronunciation', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ lessonId, phrase, isCorrect })
+                                });
+                                if (!res.ok) throw new Error(await res.text());
+                                console.log('Pronunciation result saved');
+                            } catch (err) {
+                                console.error('Pronunciation save error:', err.message);
+                            }
                         };
 
                         recognition.onend = () => {
@@ -475,7 +488,7 @@
         .then(quizzes => {
             console.log('Quizzes fetched:', quizzes);
             quizQueue = quizzes.slice();
-            renderNextQuiz(); // Initial render regardless of section
+            renderNextQuiz();
         })
         .catch(err => console.error('Quizzes fetch error:', err));
 
@@ -489,7 +502,6 @@
         });
     });
 
-    // Progress Section
     fetch('/api/user-progress')
         .then(res => res.json())
         .then(progress => {

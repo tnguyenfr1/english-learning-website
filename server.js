@@ -393,7 +393,7 @@ app.get('/api/user-progress', async (req, res) => {
     if (user.writingScores) {
         progress.push(...user.writingScores.map(s => ({
             activity: 'Writing',
-            score: s.score,
+            score: s.score, // Already a percentage
             cefr: s.cefr,
             timestamp: s.timestamp
         })));
@@ -401,13 +401,21 @@ app.get('/api/user-progress', async (req, res) => {
     if (user.homeworkScores) {
         progress.push(...user.homeworkScores.map(s => ({
             activity: `Homework (Lesson ${s.lessonId})`,
-            score: Math.round((s.score / s.total) * 100),
-            cefr: null, // Could map to CEFR if needed
-            timestamp: s.timestamp
+            score: s.total ? Math.round((s.score / s.total) * 100) : 0, // Handle undefined total
+            cefr: null,
+            timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp) // Normalize date
+        })));
+    }
+    if (user.pronunciationScores) {
+        progress.push(...user.pronunciationScores.map(s => ({
+            activity: `Pronunciation (Lesson ${s.lessonId})`,
+            score: s.isCorrect ? 100 : 0,
+            cefr: null,
+            timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp)
         })));
     }
     console.log('Returning progress:', progress);
-    res.json(progress.sort((a, b) => b.timestamp - a.timestamp)); // Newest first
+    res.json(progress.sort((a, b) => b.timestamp - a.timestamp));
 });
 
 // CHANGED: Allow /api/user-data for non-logged-in users
