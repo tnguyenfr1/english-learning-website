@@ -580,48 +580,28 @@ app.post('/api/comprehension', async (req, res) => {
 
 // Public homework (feedback always, save if logged in)
 app.post('/api/homework', async (req, res) => {
-    console.log('Homework request:', req.body);
     const { lessonId, answers } = req.body;
-    try {
-        const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
-        const lessons = db.collection('lessons');
-        const lesson = await lessons.findOne({ _id: new ObjectId(lessonId) });
-        if (!lesson || !lesson.homework || lesson.homework.length === 0) {
-            console.log('Lesson or homework not found:', lessonId);
-            return res.status(404).send('Lesson or homework not found');
-        }
-        let score = 0;
-        const feedback = lesson.homework.map((q, i) => {
-            const normalizedAnswer = normalizeText(answers[i]);
-            const normalizedCorrect = normalizeText(q.correctAnswer);
-            const isCorrect = normalizedAnswer === normalizedCorrect;
-            if (isCorrect) score++;
-            return { question: q.question, correct: isCorrect, correctAnswer: q.correctAnswer, userAnswer: answers[i] };
-        });
-        const homeworkScore = Math.round((score / lesson.homework.length) * 100);
+    const db = await ensureDBConnection();
+    const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(lessonId) });
+    if (!lesson || !lesson.homework) return res.status(404).json({ error: 'Lesson or homework not found' });
 
-        if (req.session.userId) {
-            const users = db.collection('users');
-            const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
-            if (!user.homeworkScores) user.homeworkScores = [];
-            const existingScoreIndex = user.homeworkScores.findIndex(s => s.lessonId.toString() === lessonId);
-            if (existingScoreIndex !== -1) {
-                user.homeworkScores[existingScoreIndex].score = homeworkScore;
-                user.homeworkScores[existingScoreIndex].title = lesson.title;
-            } else {
-                user.homeworkScores.push({ lessonId, score: homeworkScore, title: lesson.title });
-            }
-            await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { homeworkScores: user.homeworkScores } });
-            await updateUserScore(req.session.userId, db);
-            console.log('Homework saved for user:', req.session.userId);
-        }
-        console.log('Homework processed:', { lessonId, homeworkScore });
-        res.json({ score: score, total: lesson.homework.length, feedback });
-    } catch (err) {
-        console.error('Homework error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+    const feedback = lesson.homework.map((q, i) => ({
+        question: q.question,
+        correct: q.type === 'fill-in' ? answers[i].toLowerCase() === q.correctAnswer.toLowerCase() : answers[i] === q.correctAnswer,
+        correctAnswer: q.correctAnswer
+    }));
+    const score = feedback.filter(f => f.correct).length;
+    const total = lesson.homework.length;
+
+    if (req.session.userId) {
+        await db.collection('users').updateOne(
+            { _id: new ObjectId(req.session.userId) },
+            { $push: { homeworkScores: { lessonId, score, total, timestamp: new Date() } } }
+        );
+        console.log('Homework score saved for user:', req.session.userId);
     }
+
+    res.json({ score, total, feedback });
 });
 
 // Public quiz submission (feedback always, save if logged in)
