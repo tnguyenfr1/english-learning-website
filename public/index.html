@@ -320,6 +320,7 @@
             const levelFilter = document.getElementById('levelFilter');
 
             function updateJumpOptions(filterLevel) {
+                console.log('Updating jump options for level:', filterLevel);
                 lessonJump.innerHTML = '<option value="">Jump to Lesson</option>';
                 lessons
                     .filter(lesson => !filterLevel || lesson.level === filterLevel)
@@ -332,7 +333,8 @@
             }
 
             function renderLessons(filterLevel) {
-                console.time('Render Lessons'); // Log render time
+                console.time('Render Lessons');
+                console.log('Rendering lessons for level:', filterLevel);
                 lessonList.innerHTML = lessons
                     .filter(lesson => !filterLevel || lesson.level === filterLevel)
                     .map(lesson => `
@@ -382,11 +384,15 @@
                     `).join('');
                 console.timeEnd('Render Lessons');
                 attachHandlers();
-                updateJumpOptions(filterLevel);
+                updateJumpOptions(filterLevel); // Ensure this runs after render
             }
 
-            renderLessons('');
-            levelFilter.addEventListener('change', (e) => renderLessons(e.target.value));
+            renderLessons(''); // Initial render with no filter
+            levelFilter.addEventListener('change', (e) => {
+                const selectedLevel = e.target.value;
+                console.log('Level filter changed to:', selectedLevel);
+                renderLessons(selectedLevel);
+            });
             lessonJump.addEventListener('change', (e) => {
                 const targetId = e.target.value;
                 const target = document.getElementById(targetId);
@@ -410,24 +416,23 @@
                 };
             }
 
-            let recognition = null; // Single instance for cleanup
+            let recognition = null;
 
             function attachHandlers() {
-                // Clean up old listeners by re-rendering fresh DOM
                 document.querySelectorAll('.lesson-item').forEach(item => {
                     const header = item.querySelector('span');
-                    header.removeEventListener('click', header._clickHandler); // Remove old handler if exists
+                    header.removeEventListener('click', header._clickHandler);
                     const debouncedToggle = debounce((e) => {
                         e.stopPropagation();
                         const content = item.querySelector('.lesson-content');
                         content.classList.toggle('active');
-                    }, 200); // 200ms debounce
-                    header._clickHandler = debouncedToggle; // Store for cleanup
+                    }, 200);
+                    header._clickHandler = debouncedToggle;
                     header.addEventListener('click', debouncedToggle);
                 });
 
                 document.querySelectorAll('.homeworkForm').forEach(form => {
-                    form.removeEventListener('submit', form._submitHandler); // Clean up
+                    form.removeEventListener('submit', form._submitHandler);
                     const submitHandler = async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -477,7 +482,7 @@
                 if (!recognition) {
                     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
                     recognition.lang = 'en-US';
-                    recognition.continuous = false; // Prevent continuous listening
+                    recognition.continuous = false;
                 }
                 let isRecognizing = false;
 
@@ -510,7 +515,7 @@
                         recognition.onend = () => {
                             isRecognizing = false;
                             button.disabled = false;
-                            recognition.stop(); // Ensure it stops
+                            recognition.stop();
                         };
                         recognition.onerror = (event) => {
                             resultSpan.textContent = `Error: ${event.error}`;
@@ -526,70 +531,97 @@
         })
         .catch(err => console.error('Lessons error:', err));
 
-        let quizQueue = [];
-        function renderNextQuiz() {
-            const quizList = document.getElementById('quizList');
-            if (quizQueue.length === 0) {
-                quizList.innerHTML = '<p>No more quizzes available right now!</p>';
-                fetch('/api/quizzes')
-                    .then(res => res.json())
-                    .then(quizzes => {
-                        quizQueue = quizzes.slice(); // Refresh queue
+    let quizQueue = [];
+    let activeQuizTimer = null; // Track active timer
+
+    function renderNextQuiz() {
+        const quizList = document.getElementById('quizList');
+        if (quizQueue.length === 0) {
+            quizList.innerHTML = '<p>No more quizzes available right now!</p>';
+            fetch('/api/quizzes')
+                .then(res => res.json())
+                .then(quizzes => {
+                    quizQueue = quizzes.slice();
+                    if (document.getElementById('quizzes').classList.contains('active')) {
                         renderNextQuiz();
-                    });
+                    }
+                });
+            return;
+        }
+        const quiz = quizQueue.shift();
+        quizList.innerHTML = `
+            <div class="quiz" data-id="${quiz._id}">
+                <h3>${quiz.title} (${quiz.level})</h3>
+                <p>Time: <span id="timer-${quiz._id}">${quiz.timeLimit}</span>s</p>
+                <form class="quizForm" data-id="${quiz._id}">
+                    ${quiz.questions.map((q, i) => `
+                        <p>${q.prompt}</p>
+                        <input type="text" name="answer${i}" required>
+                    `).join('')}
+                    <button type="submit">Submit</button>
+                </form>
+            </div>
+        `;
+        let timeLeft = quiz.timeLimit;
+        if (activeQuizTimer) clearInterval(activeQuizTimer); // Clear any old timer
+        activeQuizTimer = setInterval(() => {
+            if (!document.getElementById('quizzes').classList.contains('active')) {
+                clearInterval(activeQuizTimer);
                 return;
             }
-            const quiz = quizQueue.shift(); // Take first quiz
-            quizList.innerHTML = `
-                <div class="quiz" data-id="${quiz._id}">
-                    <h3>${quiz.title} (${quiz.level})</h3>
-                    <p>Time: <span id="timer-${quiz._id}">${quiz.timeLimit}</span>s</p>
-                    <form class="quizForm" data-id="${quiz._id}">
-                        ${quiz.questions.map((q, i) => `
-                            <p>${q.prompt}</p>
-                            <input type="text" name="answer${i}" required>
-                        `).join('')}
-                        <button type="submit">Submit</button>
-                    </form>
-                </div>
-            `;
-            let timeLeft = quiz.timeLimit;
-            const timer = setInterval(() => {
-                timeLeft--;
-                document.getElementById(`timer-${quiz._id}`).textContent = timeLeft;
-                if (timeLeft <= 0) {
-                    clearInterval(timer);
-                    document.querySelector(`form[data-id="${quiz._id}"]`).dispatchEvent(new Event('submit'));
-                }
-            }, 1000);
+            timeLeft--;
+            const timerElement = document.getElementById(`timer-${quiz._id}`);
+            if (timerElement) timerElement.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(activeQuizTimer);
+                const form = document.querySelector(`form[data-id="${quiz._id}"]`);
+                if (form) form.dispatchEvent(new Event('submit'));
+            }
+        }, 1000);
 
-            document.querySelector(`form[data-id="${quiz._id}"]`).addEventListener('submit', async (e) => {
-                e.preventDefault();
-                clearInterval(timer);
-                const answers = Array.from(e.target.querySelectorAll('input')).map(input => input.value);
-                try {
-                    const res = await fetch('/api/submit-quiz', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ quizId: quiz._id, answers })
-                    });
-                    if (!res.ok) throw new Error(await res.text());
-                    const result = await res.json();
-                    alert(`Score: ${Math.round((result.score / result.total) * 100)}%\n${result.feedback.map(f => `${f.prompt}: ${f.correct ? 'Correct' : `Wrong (${f.correctAnswer})`}`).join('\n')}`);
-                    renderNextQuiz(); // Load next quiz
-                } catch (err) {
-                    alert('Quiz failed: ' + err.message);
+        document.querySelector(`form[data-id="${quiz._id}"]`).addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearInterval(activeQuizTimer);
+            activeQuizTimer = null;
+            const answers = Array.from(e.target.querySelectorAll('input')).map(input => input.value);
+            try {
+                const res = await fetch('/api/submit-quiz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quizId: quiz._id, answers })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const result = await res.json();
+                alert(`Score: ${Math.round((result.score / result.total) * 100)}%\n${result.feedback.map(f => `${f.prompt}: ${f.correct ? 'Correct' : `Wrong (${f.correctAnswer})`}`).join('\n')}`);
+                if (document.getElementById('quizzes').classList.contains('active')) {
+                    renderNextQuiz();
                 }
-            });
-        }
+            } catch (err) {
+                alert('Quiz failed: ' + err.message);
+            }
+        });
+    }
 
-        fetch('/api/quizzes')
-            .then(res => res.json())
-            .then(quizzes => {
-                quizQueue = quizzes.slice(); // Copy quizzes to queue
-                renderNextQuiz(); // Start with first quiz
-            })
-            .catch(err => console.error('Quizzes error:', err));
+    fetch('/api/quizzes')
+        .then(res => res.json())
+        .then(quizzes => {
+            quizQueue = quizzes.slice();
+            if (document.getElementById('quizzes').classList.contains('active')) {
+                renderNextQuiz();
+            }
+        })
+        .catch(err => console.error('Quizzes error:', err));
+
+    // TOC click to stop quiz timer if leaving section
+    document.querySelectorAll('.toc a').forEach(link => {
+        link.addEventListener('click', (e) => {
+            // ... (existing TOC logic) ...
+            if (activeQuizTimer && link.getAttribute('href') !== '#quizzes') {
+                clearInterval(activeQuizTimer);
+                activeQuizTimer = null;
+            }
+        });
+    });
 
         document.getElementById('submitWriting').addEventListener('click', async () => {
             const text = document.getElementById('writingInput').value.trim();
