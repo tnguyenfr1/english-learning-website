@@ -74,7 +74,7 @@
         h2, h3, h4 { 
             font-weight: 700; 
             margin-bottom: 20px; 
-            list-style: none; /* Remove bullets */
+            list-style: none; /* No bullets */
         }
         h2 { font-size: 28px; }
         h3 { font-size: 22px; }
@@ -105,21 +105,36 @@
             margin: 10px 10px 10px 0; 
             font-size: 16px; 
         }
-        .lesson { 
+        .lesson-list { 
+            list-style: none; /* No bullets */
             margin: 20px 0; 
-            background: #2c2c2e; 
-            border-radius: 10px; 
-            overflow: hidden; 
         }
-        .lesson summary { 
- AGE: 15px; 
+        .lesson-item { 
+            background: #2c2c2e; 
+            padding: 15px; 
+            margin-bottom: 10px; 
+            border-radius: 10px; 
             cursor: pointer; 
-            font-weight: 700; 
-            background: #333334; 
             transition: background 0.3s; 
         }
-        .lesson summary:hover { background: #3a3a3c; }
-        .lesson-content { padding: 20px; }
+        .lesson-item:hover { background: #3a3a3c; }
+        .lesson-item span { 
+            font-weight: 700; 
+            color: #fff; 
+        }
+        .lesson-item .level { 
+            color: #86868b; 
+            font-size: 14px; 
+            margin-left: 10px; 
+        }
+        .lesson-content { 
+            display: none; 
+            padding: 15px; 
+            background: #1d1d1e; 
+            border-radius: 10px; 
+            margin-top: 10px; 
+        }
+        .lesson-content.active { display: block; }
         .lesson-content p { color: #d1d1d1; }
         form { margin: 15px 0; }
         input[type="text"], input[type="radio"] + label, select { 
@@ -173,11 +188,11 @@
         ul { list-style: none; }
         ul li { margin: 10px 0; }
         ul li a { 
-            color: #2997ff; /* Brighter blue for links */
+            color: #2997ff; 
             text-decoration: none; 
             transition: color 0.3s; 
         }
-        ul li a:hover { color: #66b0ff; /* Lighter blue on hover */ }
+        ul li a:hover { color: #66b0ff; }
         #backToTop { 
             position: fixed; 
             bottom: 40px; 
@@ -235,7 +250,7 @@
                 <select id="lessonJump">
                     <option value="">Jump to Lesson</option>
                 </select>
-                <div id="lessonList"></div>
+                <ul id="lessonList" class="lesson-list"></ul>
             </section>
             <section id="quizzes">
                 <h2>Quizzes</h2>
@@ -312,13 +327,26 @@
                 const lessonJump = document.getElementById('lessonJump');
                 const levelFilter = document.getElementById('levelFilter');
 
+                function updateJumpOptions(filterLevel) {
+                    lessonJump.innerHTML = '<option value="">Jump to Lesson</option>';
+                    lessons
+                        .filter(lesson => !filterLevel || lesson.level === filterLevel)
+                        .forEach(lesson => {
+                            const option = document.createElement('option');
+                            option.value = `lesson-${lesson._id}`;
+                            option.textContent = `${lesson.title} (${lesson.level || 'N/A'})`;
+                            lessonJump.appendChild(option);
+                        });
+                }
+
                 function renderLessons(filterLevel) {
                     lessonList.innerHTML = lessons
                         .filter(lesson => !filterLevel || lesson.level === filterLevel)
                         .map(lesson => `
-                            <details class="lesson" id="lesson-${lesson._id}">
-                                <summary>${lesson.title} (${lesson.level || 'N/A'})</summary>
-                                <div class="lesson-content">
+                            <li class="lesson-item" data-id="lesson-${lesson._id}">
+                                <span>${lesson.title}</span>
+                                <span class="level">(${lesson.level || 'N/A'})</span>
+                                <div class="lesson-content" id="content-${lesson._id}">
                                     <h3>Reading Section</h3>
                                     <p>${lesson.content}</p>
                                     ${lesson.comprehension?.questions?.length > 0 ? `
@@ -357,18 +385,14 @@
                                         `).join('')}
                                     ` : ''}
                                 </div>
-                            </details>
+                            </li>
                         `).join('');
                     attachHandlers();
+                    updateJumpOptions(filterLevel);
                 }
 
                 renderLessons('');
-                lessons.forEach(lesson => {
-                    const option = document.createElement('option');
-                    option.value = `lesson-${lesson._id}`;
-                    option.textContent = `${lesson.title} (${lesson.level || 'N/A'})`;
-                    lessonJump.appendChild(option);
-                });
+                levelFilter.addEventListener('change', (e) => renderLessons(e.target.value));
                 lessonJump.addEventListener('change', (e) => {
                     const targetId = e.target.value;
                     const target = document.getElementById(targetId);
@@ -378,13 +402,20 @@
                         document.getElementById('lessons').classList.add('active');
                         document.querySelector('.toc a[href="#lessons"]').classList.add('active');
                         target.scrollIntoView({ behavior: 'smooth' });
-                        target.open = true;
+                        const content = document.getElementById(`content-${target.dataset.id.split('-')[1]}`);
+                        if (content) content.classList.add('active');
                     }
                     e.target.value = '';
                 });
-                levelFilter.addEventListener('change', (e) => renderLessons(e.target.value));
 
                 function attachHandlers() {
+                    document.querySelectorAll('.lesson-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const content = item.querySelector('.lesson-content');
+                            content.classList.toggle('active');
+                        });
+                    });
+
                     document.querySelectorAll('.homeworkForm').forEach(form => {
                         form.addEventListener('submit', async (e) => {
                             e.preventDefault();
