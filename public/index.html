@@ -105,11 +105,11 @@
             margin: 10px 10px 10px 0; 
             font-size: 16px; 
         }
-        .lesson-list { 
+        .lesson-list, .blog-list { 
             list-style: none; 
             margin: 20px 0; 
         }
-        .lesson-item { 
+        .lesson-item, .blog-item { 
             background: #2c2c2e; 
             padding: 15px; 
             margin-bottom: 10px; 
@@ -117,8 +117,8 @@
             cursor: pointer; 
             transition: background 0.3s; 
         }
-        .lesson-item:hover { background: #3a3a3c; }
-        .lesson-item span { 
+        .lesson-item:hover, .blog-item:hover { background: #3a3a3c; }
+        .lesson-item span, .blog-item span { 
             font-weight: 700; 
             color: #fff; 
         }
@@ -127,15 +127,16 @@
             font-size: 14px; 
             margin-left: 10px; 
         }
-        .lesson-content { 
+        .lesson-content, .blog-content { 
             display: none; 
             padding: 15px; 
             background: #1d1d1e; 
             border-radius: 10px; 
             margin-top: 10px; 
         }
-        .lesson-content.active { display: block; }
-        .lesson-content p { color: #d1d1d1; }
+        .lesson-content.active, .blog-content.active { display: block; }
+        .lesson-content p, .blog-content p { color: #d1d1d1; }
+        .blog-content small { color: #86868b; }
         form { margin: 15px 0; }
         input[type="text"], input[type="radio"] + label, select { 
             display: block; 
@@ -176,15 +177,6 @@
             margin-bottom: 20px; 
         }
         #writingFeedback { color: #d1d1d1; }
-        .blog-post { margin: 20px 0; }
-        .blog-post summary { 
-            font-weight: 700; 
-            padding: 15px; 
-            background: #2c2c2e; 
-            border-radius: 10px; 
-            cursor: pointer; 
-        }
-        .blog-post p { padding: 15px; color: #d1d1d1; }
         ul { list-style: none; }
         ul li { margin: 10px 0; }
         ul li a { 
@@ -268,7 +260,7 @@
             </section>
             <section id="blog">
                 <h2>Blog</h2>
-                <div id="blogList"></div>
+                <ul id="blogList" class="blog-list"></ul>
             </section>
         </div>
     </div>
@@ -410,9 +402,9 @@
 
                 function attachHandlers() {
                     document.querySelectorAll('.lesson-item').forEach(item => {
-                        const header = item.querySelector('span'); // Only toggle on title click
+                        const header = item.querySelector('span');
                         header.addEventListener('click', (e) => {
-                            e.stopPropagation(); // Prevent bubbling to item
+                            e.stopPropagation();
                             const content = item.querySelector('.lesson-content');
                             content.classList.toggle('active');
                         });
@@ -421,7 +413,7 @@
                     document.querySelectorAll('.homeworkForm').forEach(form => {
                         form.addEventListener('submit', async (e) => {
                             e.preventDefault();
-                            e.stopPropagation(); // Stop bubbling to lesson-item
+                            e.stopPropagation();
                             const lessonId = form.dataset.lessonId;
                             const answers = Array.from(form.querySelectorAll('input, select')).map(input => input.value);
                             try {
@@ -442,7 +434,7 @@
                     document.querySelectorAll('.comprehensionForm').forEach(form => {
                         form.addEventListener('submit', async (e) => {
                             e.preventDefault();
-                            e.stopPropagation(); // Stop bubbling to lesson-item
+                            e.stopPropagation();
                             const lessonId = form.dataset.lessonId;
                             const answers = Array.from(form.querySelectorAll('input:checked')).map(input => input.value === 'true');
                             try {
@@ -466,7 +458,7 @@
 
                     document.querySelectorAll('.recordButton').forEach(button => {
                         button.addEventListener('click', (e) => {
-                            e.stopPropagation(); // Stop bubbling to lesson-item
+                            e.stopPropagation();
                             if (isRecognizing) return;
                             const phrase = button.dataset.phrase;
                             const lessonId = button.dataset.lessonId;
@@ -504,64 +496,68 @@
             })
             .catch(err => console.error('Lessons error:', err));
 
+        let quizQueue = [];
+        function renderNextQuiz() {
+            const quizList = document.getElementById('quizList');
+            if (quizQueue.length === 0) {
+                quizList.innerHTML = '<p>No more quizzes available right now!</p>';
+                fetch('/api/quizzes')
+                    .then(res => res.json())
+                    .then(quizzes => {
+                        quizQueue = quizzes.slice(); // Refresh queue
+                        renderNextQuiz();
+                    });
+                return;
+            }
+            const quiz = quizQueue.shift(); // Take first quiz
+            quizList.innerHTML = `
+                <div class="quiz" data-id="${quiz._id}">
+                    <h3>${quiz.title} (${quiz.level})</h3>
+                    <p>Time: <span id="timer-${quiz._id}">${quiz.timeLimit}</span>s</p>
+                    <form class="quizForm" data-id="${quiz._id}">
+                        ${quiz.questions.map((q, i) => `
+                            <p>${q.prompt}</p>
+                            <input type="text" name="answer${i}" required>
+                        `).join('')}
+                        <button type="submit">Submit</button>
+                    </form>
+                </div>
+            `;
+            let timeLeft = quiz.timeLimit;
+            const timer = setInterval(() => {
+                timeLeft--;
+                document.getElementById(`timer-${quiz._id}`).textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    document.querySelector(`form[data-id="${quiz._id}"]`).dispatchEvent(new Event('submit'));
+                }
+            }, 1000);
+
+            document.querySelector(`form[data-id="${quiz._id}"]`).addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearInterval(timer);
+                const answers = Array.from(e.target.querySelectorAll('input')).map(input => input.value);
+                try {
+                    const res = await fetch('/api/submit-quiz', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ quizId: quiz._id, answers })
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    const result = await res.json();
+                    alert(`Score: ${Math.round((result.score / result.total) * 100)}%\n${result.feedback.map(f => `${f.prompt}: ${f.correct ? 'Correct' : `Wrong (${f.correctAnswer})`}`).join('\n')}`);
+                    renderNextQuiz(); // Load next quiz
+                } catch (err) {
+                    alert('Quiz failed: ' + err.message);
+                }
+            });
+        }
+
         fetch('/api/quizzes')
             .then(res => res.json())
             .then(quizzes => {
-                document.getElementById('quizList').innerHTML = quizzes.map(quiz => `
-                    <div class="quiz" data-id="${quiz._id}">
-                        <h3>${quiz.title} (${quiz.level})</h3>
-                        <p>Time: ${quiz.timeLimit}s</p>
-                        <button class="startQuiz" data-id="${quiz._id}">Start</button>
-                        <div class="quizContent" style="display: none;"></div>
-                    </div>
-                `).join('');
-
-                document.querySelectorAll('.startQuiz').forEach(button => {
-                    button.addEventListener('click', () => {
-                        const quizId = button.dataset.id;
-                        const quiz = quizzes.find(q => q._id === quizId);
-                        const quizContent = button.nextElementSibling;
-                        quizContent.style.display = 'block';
-                        button.style.display = 'none';
-                        let timeLeft = quiz.timeLimit;
-                        quizContent.innerHTML = `
-                            <p>Time: <span id="timer-${quizId}">${timeLeft}</span>s</p>
-                            <form class="quizForm" data-id="${quizId}">
-                                ${quiz.questions.map((q, i) => `
-                                    <p>${q.prompt}</p>
-                                    <input type="text" name="answer${i}" required>
-                                `).join('')}
-                                <button type="submit">Submit</button>
-                            </form>
-                        `;
-                        const timer = setInterval(() => {
-                            timeLeft--;
-                            document.getElementById(`timer-${quizId}`).textContent = timeLeft;
-                            if (timeLeft <= 0) {
-                                clearInterval(timer);
-                                document.querySelector(`form[data-id="${quizId}"]`).dispatchEvent(new Event('submit'));
-                            }
-                        }, 1000);
-
-                        document.querySelector(`form[data-id="${quizId}"]`).addEventListener('submit', async (e) => {
-                            e.preventDefault();
-                            clearInterval(timer);
-                            const answers = Array.from(e.target.querySelectorAll('input')).map(input => input.value);
-                            try {
-                                const res = await fetch('/api/submit-quiz', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ quizId, answers })
-                                });
-                                if (!res.ok) throw new Error(await res.text());
-                                const result = await res.json();
-                                alert(`Score: ${Math.round((result.score / result.total) * 100)}%\n${result.feedback.map(f => `${f.prompt}: ${f.correct ? 'Correct' : `Wrong (${f.correctAnswer})`}`).join('\n')}`);
-                            } catch (err) {
-                                alert('Quiz failed: ' + err.message);
-                            }
-                        });
-                    });
-                });
+                quizQueue = quizzes.slice(); // Copy quizzes to queue
+                renderNextQuiz(); // Start with first quiz
             })
             .catch(err => console.error('Quizzes error:', err));
 
@@ -598,12 +594,22 @@
             .then(res => res.json())
             .then(blogs => {
                 document.getElementById('blogList').innerHTML = blogs.map(blog => `
-                    <details class="blog-post">
-                        <summary>${blog.title}</summary>
-                        <p>${blog.content}</p>
-                        <small>Posted: ${new Date(blog.createdAt).toLocaleDateString()}</small>
-                    </details>
+                    <li class="blog-item">
+                        <span>${blog.title}</span>
+                        <div class="blog-content">
+                            <p>${blog.content}</p>
+                            <small>Posted: ${new Date(blog.createdAt).toLocaleDateString()}</small>
+                        </div>
+                    </li>
                 `).join('');
+                document.querySelectorAll('.blog-item').forEach(item => {
+                    const header = item.querySelector('span');
+                    header.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const content = item.querySelector('.blog-content');
+                        content.classList.toggle('active');
+                    });
+                });
             })
             .catch(err => console.error('Blog error:', err));
 

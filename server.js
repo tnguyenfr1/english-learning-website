@@ -677,14 +677,41 @@ app.post('/api/pronunciation', async (req, res) => {
 });
 
 // CHANGED: Made fully public
-function mapToCEFR(score, wordCount) {
-    if (score < 20 || wordCount < 20) return { level: 'A1', reason: 'Basic vocabulary and structure, many errors' };
-    if (score < 40 || wordCount < 50) return { level: 'A2', reason: 'Simple sentences, frequent errors' };
-    if (score < 60 || wordCount < 100) return { level: 'B1', reason: 'Coherent ideas, moderate errors' };
-    if (score < 80 || wordCount < 150) return { level: 'B2', reason: 'Complex sentences, some errors' };
-    if (score < 95 || wordCount < 200) return { level: 'C1', reason: 'Fluent, minor errors' };
-    return { level: 'C2', reason: 'Near-native fluency, minimal errors' };
+function mapToCEFR(score, wordCount, grammarScore, styleScore) {
+    const reasons = [];
+
+    // Base CEFR on score ranges
+    if (score < 20) {
+        reasons.push('Very basic text with significant errors.');
+        return { level: 'A1', reason: reasons.join(' ') };
+    }
+    if (score < 40) {
+        reasons.push('Simple text with frequent errors.');
+        return { level: 'A2', reason: reasons.join(' ') };
+    }
+    if (score < 60) {
+        reasons.push('Coherent ideas but noticeable errors.');
+        return { level: 'B1', reason: reasons.join(' ') };
+    }
+    if (score < 80) {
+        reasons.push('Complex ideas with some errors.');
+        return { level: 'B2', reason: reasons.join(' ') };
+    }
+    if (score < 95) {
+        reasons.push('Fluent text with minor errors.');
+        return { level: 'C1', reason: reasons.join(' ') };
+    }
+    reasons.push('Near-native fluency with minimal errors.');
+    
+    // Adjust based on additional factors
+    if (wordCount < 50) reasons.push('Text is too short to show full ability—aim for 50+ words.');
+    if (grammarScore < 70) reasons.push('Work on grammar accuracy.');
+    if (styleScore < 70) reasons.push('Improve style (e.g., less repetition, more active voice).');
+
+    return { level: 'C2', reason: reasons.join(' ') };
 }
+
+
 
 app.post('/api/grade-writing', async (req, res) => {
     const { text } = req.body;
@@ -693,6 +720,7 @@ app.post('/api/grade-writing', async (req, res) => {
     try {
         console.log('Grading text:', text);
 
+        // LanguageTool Grammar Check
         const ltResponse = await axios.post('https://api.languagetool.org/v2/check', {
             text: text,
             language: 'en-US',
@@ -709,37 +737,57 @@ app.post('/api/grade-writing', async (req, res) => {
         let grammarScore = 100 - (errorCount * 10);
         grammarScore = Math.max(0, grammarScore);
         const grammarFeedback = errorCount > 0 
-            ? grammarCheck.matches.map(m => `${m.message} (e.g., "${m.context.text.substring(m.context.offset, m.context.offset + m.context.length)}")`).join('; ')
-            : 'No grammar errors found!';
+            ? grammarCheck.matches.map(m => `${m.message} (e.g., "${m.context.text.substring(m.context.offset, m.context.offset + m.context.length)}")`)
+            : ['No grammar errors found!'];
 
-        const wordCount = text.split(/\s+/).length;
-        const sentenceCount = text.split(/[.!?]+/).length - 1 || 1;
+        // Text Stats
+        const words = text.split(/\s+/).filter(w => w.length > 0);
+        const wordCount = words.length;
+        const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        const sentenceCount = sentences.length;
         const avgWordsPerSentence = wordCount / sentenceCount;
+
+        // Style Checks
+        const passiveVoiceCount = text.match(/\b(is|are|was|were|been)\s+\w+ed\b/gi)?.length || 0;
+        const uniqueWords = new Set(words.map(w => w.toLowerCase())).size;
+        const vocabVariety = uniqueWords / wordCount;
+        const styleFeedback = [];
+        if (passiveVoiceCount > sentenceCount * 0.2) styleFeedback.push('Too much passive voice—try active voice (e.g., "The dog ate" vs. "Was eaten by the dog").');
+        if (vocabVariety < 0.7) styleFeedback.push('Use more varied vocabulary to avoid repetition.');
+
+        // Readability (Flesch Reading Ease, simplified)
+        const syllables = words.reduce((sum, word) => sum + (word.match(/[aeiouy]/gi)?.length || 1), 0);
+        const fleschScore = 206.835 - 1.015 * (wordCount / sentenceCount) - 84.6 * (syllables / wordCount);
+        const readabilityFeedback = fleschScore < 60 ? 'Text is hard to read—simplify sentences or words.' : 'Good readability!';
+
+        // Scoring
         const wordCountBonus = Math.min(wordCount / 50, 1) * 30;
+        const styleScore = 100 - (passiveVoiceCount * 5 + (vocabVariety < 0.7 ? 10 : 0));
+        const totalScore = Math.round((grammarScore * 0.5) + (wordCountBonus * 0.3) + (styleScore * 0.2));
+        const cefrData = mapToCEFR(totalScore, wordCount);
 
-        const score = Math.round((grammarScore * 0.7) + (wordCountBonus * 0.3));
-        const cefrData = mapToCEFR(score, wordCount);
+        // Feedback
+        const feedback = [
+            `Words: ${wordCount}, Sentences: ${sentenceCount}, Avg. Words/Sentence: ${avgWordsPerSentence.toFixed(1)}`,
+            `Grammar: ${grammarFeedback.join('; ')}`,
+            ...(styleFeedback.length ? [`Style: ${styleFeedback.join('; ')}`] : ['Style: No major issues.']),
+            `Readability: ${readabilityFeedback} (Flesch Score: ${fleschScore.toFixed(1)})`
+        ].join('\n');
 
-        const feedback = `
-            Your writing has ${wordCount} words and ${sentenceCount} sentences. 
-            ${avgWordsPerSentence < 5 ? 'Try longer sentences for complexity.' : 'Good sentence length.'}
-            ${grammarScore < 80 ? 'Check your grammar: ' + grammarFeedback : 'Solid grammar: ' + grammarFeedback}
-        `;
-
-        // NEW: Save score if logged in
+        // Save score if logged in
         if (req.session.userId) {
             const db = await ensureDBConnection();
             if (db) {
                 const users = db.collection('users');
                 await users.updateOne(
                     { _id: new ObjectId(req.session.userId) },
-                    { $push: { writingScores: { score, cefr: cefrData.level, timestamp: new Date() } } }
+                    { $push: { writingScores: { score: totalScore, cefr: cefrData.level, timestamp: new Date() } } }
                 );
                 console.log('Writing score saved for user:', req.session.userId);
             }
         }
 
-        res.json({ score, cefr: cefrData.level, feedback });
+        res.json({ score: totalScore, cefr: cefrData.level, feedback });
     } catch (error) {
         console.error('Grading error:', error.message, error.stack);
         const wordCount = text.split(/\s+/).length;
