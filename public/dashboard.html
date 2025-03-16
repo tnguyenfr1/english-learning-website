@@ -177,7 +177,10 @@
             .catch(err => console.error('Leaderboard error:', err));
 
             fetch('/api/lessons')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+            return res.json();
+        })
         .then(lessons => {
             console.log('Lessons fetched:', lessons);
             const lessonList = document.getElementById('lessonList');
@@ -261,7 +264,7 @@
             lessonJump.addEventListener('change', (e) => {
                 const targetId = e.target.value;
                 console.log('Jump selected:', targetId);
-                const target = document.querySelector(`[data-id="${targetId}"]`); // Use data-id instead
+                const target = document.querySelector(`[data-id="${targetId}"]`);
                 if (target) {
                     document.querySelectorAll('.content section').forEach(s => s.classList.remove('active'));
                     document.querySelectorAll('.toc a').forEach(a => a.classList.remove('active'));
@@ -289,7 +292,17 @@
                 };
             }
 
-            let recognition = null;
+            // Move recognition outside attachHandlers
+            let recognition;
+            try {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.lang = 'en-US';
+                recognition.continuous = false;
+                console.log('Speech recognition initialized');
+            } catch (err) {
+                console.error('Speech recognition not supported:', err);
+                recognition = null;
+            }
 
             function attachHandlers() {
                 document.querySelectorAll('.lesson-item').forEach(item => {
@@ -352,16 +365,12 @@
                     form.addEventListener('submit', submitHandler);
                 });
 
-                try {
-                    if (!recognition) {
-                        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-                        recognition.lang = 'en-US';
-                        recognition.continuous = false;
-                        console.log('Speech recognition initialized');
-                    }
-                } catch (err) {
-                    console.error('Speech recognition not supported:', err);
-                    document.querySelectorAll('.recordButton').forEach(btn => btn.disabled = true);
+                if (!recognition) {
+                    document.querySelectorAll('.recordButton').forEach(btn => {
+                        btn.disabled = true;
+                        btn.textContent = 'Recording Unsupported';
+                    });
+                    return;
                 }
                 let isRecognizing = false;
 
@@ -369,7 +378,7 @@
                     button.removeEventListener('click', button._clickHandler);
                     const clickHandler = async (e) => {
                         e.stopPropagation();
-                        if (isRecognizing || !recognition) return;
+                        if (isRecognizing) return;
                         const phrase = button.dataset.phrase;
                         const lessonId = button.dataset.lessonId;
                         const resultSpan = document.getElementById(button.dataset.resultId);
@@ -395,6 +404,7 @@
                                 console.log('Pronunciation result saved');
                             } catch (err) {
                                 console.error('Pronunciation save error:', err.message);
+                                resultSpan.textContent += ` (Save failed: ${err.message})`;
                             }
                         };
 
@@ -417,7 +427,10 @@
                 });
             }
         })
-        .catch(err => console.error('Lessons fetch error:', err));
+        .catch(err => {
+            console.error('Lessons fetch error:', err);
+            document.getElementById('lessonList').innerHTML = '<li>Failed to load lessons: ' + err.message + '</li>';
+        });
 
     let quizQueue = [];
     let activeQuizTimer = null;

@@ -387,35 +387,41 @@ app.post('/api/reset-password-submit', async (req, res) => {
 // Update /api/user-progress
 app.get('/api/user-progress', async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
-    const db = await ensureDBConnection();
-    const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
-    const progress = [];
-    if (user.writingScores) {
-        progress.push(...user.writingScores.map(s => ({
-            activity: 'Writing',
-            score: s.score, // Already a percentage
-            cefr: s.cefr,
-            timestamp: s.timestamp
-        })));
+    try {
+        const db = await ensureDBConnection();
+        if (!db) throw new Error('Database connection failed');
+        const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
+        const progress = [];
+        if (user.writingScores) {
+            progress.push(...user.writingScores.map(s => ({
+                activity: 'Writing',
+                score: s.score, // Already a percentage
+                cefr: s.cefr,
+                timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp || Date.now())
+            })));
+        }
+        if (user.homeworkScores) {
+            progress.push(...user.homeworkScores.map(s => ({
+                activity: `Homework (Lesson ${s.lessonId})`,
+                score: s.total ? Math.round((s.score / s.total) * 100) : 0,
+                cefr: null,
+                timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp || Date.now())
+            })));
+        }
+        if (user.pronunciationScores) {
+            progress.push(...user.pronunciationScores.map(s => ({
+                activity: `Pronunciation (Lesson ${s.lessonId})`,
+                score: s.isCorrect ? 100 : 0,
+                cefr: null,
+                timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp || Date.now())
+            })));
+        }
+        console.log('Returning progress:', progress);
+        res.json(progress.sort((a, b) => b.timestamp - a.timestamp));
+    } catch (error) {
+        console.error('Progress error:', error.message, error.stack);
+        res.status(500).json({ error: 'Failed to fetch progress: ' + error.message });
     }
-    if (user.homeworkScores) {
-        progress.push(...user.homeworkScores.map(s => ({
-            activity: `Homework (Lesson ${s.lessonId})`,
-            score: s.total ? Math.round((s.score / s.total) * 100) : 0, // Handle undefined total
-            cefr: null,
-            timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp) // Normalize date
-        })));
-    }
-    if (user.pronunciationScores) {
-        progress.push(...user.pronunciationScores.map(s => ({
-            activity: `Pronunciation (Lesson ${s.lessonId})`,
-            score: s.isCorrect ? 100 : 0,
-            cefr: null,
-            timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp)
-        })));
-    }
-    console.log('Returning progress:', progress);
-    res.json(progress.sort((a, b) => b.timestamp - a.timestamp));
 });
 
 // CHANGED: Allow /api/user-data for non-logged-in users
@@ -459,11 +465,17 @@ app.get('/api/user-data', async (req, res) => {
 
 // CHANGED: Made fully public (removed login check)
 app.get('/api/lessons', async (req, res) => {
-    console.time('Fetch Lessons');
-    const db = await ensureDBConnection();
-    const lessons = await db.collection('lessons').find({}).toArray();
-    console.timeEnd('Fetch Lessons');
-    res.json(lessons);
+    try {
+        console.time('Fetch Lessons');
+        const db = await ensureDBConnection();
+        if (!db) throw new Error('Database connection failed');
+        const lessons = await db.collection('lessons').find({}).toArray();
+        console.timeEnd('Fetch Lessons');
+        res.json(lessons);
+    } catch (error) {
+        console.error('Lessons error:', error.message, error.stack);
+        res.status(500).json({ error: 'Failed to fetch lessons: ' + error.message });
+    }
 });
 
 // CHANGED: Made fully public
@@ -581,27 +593,33 @@ app.post('/api/comprehension', async (req, res) => {
 // Public homework (feedback always, save if logged in)
 app.post('/api/homework', async (req, res) => {
     const { lessonId, answers } = req.body;
-    const db = await ensureDBConnection();
-    const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(lessonId) });
-    if (!lesson || !lesson.homework) return res.status(404).json({ error: 'Lesson or homework not found' });
+    try {
+        const db = await ensureDBConnection();
+        if (!db) throw new Error('Database connection failed');
+        const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(lessonId) });
+        if (!lesson || !lesson.homework) return res.status(404).json({ error: 'Lesson or homework not found' });
 
-    const feedback = lesson.homework.map((q, i) => ({
-        question: q.question,
-        correct: q.type === 'fill-in' ? answers[i].toLowerCase() === q.correctAnswer.toLowerCase() : answers[i] === q.correctAnswer,
-        correctAnswer: q.correctAnswer
-    }));
-    const score = feedback.filter(f => f.correct).length;
-    const total = lesson.homework.length;
+        const feedback = lesson.homework.map((q, i) => ({
+            question: q.question,
+            correct: q.type === 'fill-in' ? answers[i].toLowerCase() === q.correctAnswer.toLowerCase() : answers[i] === q.correctAnswer,
+            correctAnswer: q.correctAnswer
+        }));
+        const score = feedback.filter(f => f.correct).length;
+        const total = lesson.homework.length;
 
-    if (req.session.userId) {
-        await db.collection('users').updateOne(
-            { _id: new ObjectId(req.session.userId) },
-            { $push: { homeworkScores: { lessonId, score, total, timestamp: new Date() } } }
-        );
-        console.log('Homework score saved for user:', req.session.userId);
+        if (req.session.userId) {
+            await db.collection('users').updateOne(
+                { _id: new ObjectId(req.session.userId) },
+                { $push: { homeworkScores: { lessonId, score, total, timestamp: new Date() } } }
+            );
+            console.log('Homework score saved for user:', req.session.userId);
+        }
+
+        res.json({ score, total, feedback });
+    } catch (error) {
+        console.error('Homework error:', error.message, error.stack);
+        res.status(500).json({ error: 'Failed to process homework: ' + error.message });
     }
-
-    res.json({ score, total, feedback });
 });
 
 // Public quiz submission (feedback always, save if logged in)
@@ -650,37 +668,24 @@ app.post('/api/submit-quiz', async (req, res) => {
 
 // Public pronunciation (feedback always, save if logged in)
 app.post('/api/pronunciation', async (req, res) => {
-    console.log('Pronunciation request:', req.body);
     const { lessonId, phrase, isCorrect } = req.body;
+    if (!lessonId || !phrase || isCorrect === undefined) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
-        const lessons = db.collection('lessons');
-        const lesson = await lessons.findOne({ _id: new ObjectId(lessonId) });
-        if (!lesson || !lesson.pronunciation || !lesson.pronunciation.some(p => p.phrase === phrase)) {
-            console.log('Lesson or phrase not found:', { lessonId, phrase });
-            return res.status(404).send('Lesson or phrase not found');
-        }
+        if (!db) throw new Error('Database connection failed');
         if (req.session.userId) {
-            const users = db.collection('users');
-            const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
-            if (!user.pronunciationScores) user.pronunciationScores = [];
-            const existingScoreIndex = user.pronunciationScores.findIndex(s => s.lessonId.toString() === lessonId && s.phrase === phrase);
-            if (existingScoreIndex !== -1) {
-                user.pronunciationScores[existingScoreIndex].correct = isCorrect;
-                user.pronunciationScores[existingScoreIndex].attempts += 1;
-            } else {
-                user.pronunciationScores.push({ lessonId, phrase, correct: isCorrect, attempts: 1 });
-            }
-            await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { pronunciationScores: user.pronunciationScores } });
-            await updateUserScore(req.session.userId, db);
-            console.log('Pronunciation saved for user:', req.session.userId);
+            await db.collection('users').updateOne(
+                { _id: new ObjectId(req.session.userId) },
+                { $push: { pronunciationScores: { lessonId, phrase, isCorrect, timestamp: new Date() } } }
+            );
+            console.log('Pronunciation score saved for user:', req.session.userId);
         }
-        console.log('Pronunciation processed:', { lessonId, phrase, isCorrect });
-        res.send('Pronunciation recorded');
-    } catch (err) {
-        console.error('Pronunciation error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Pronunciation error:', error.message, error.stack);
+        res.status(500).json({ error: 'Failed to save pronunciation: ' + error.message });
     }
 });
 
