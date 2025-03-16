@@ -473,8 +473,8 @@
             .then(res => {
                 if (!res.ok) {
                     if (res.status === 401) {
-                        console.log('User not logged in, redirecting to login');
-                        window.location.href = '/index.html';
+                        console.log('User not logged in, redirecting to auth');
+                        window.location.href = '/auth.html'; // Changed from /index.html
                     }
                     throw new Error(`Failed to fetch user data: ${res.status}`);
                 }
@@ -614,7 +614,7 @@
                                     } catch (err) {
                                         console.error('Homework fetch error:', err.message);
                                         alert('Failed to submit homework: ' + err.message);
-                                        if (err.message.includes('401')) window.location.href = '/index.html';
+                                        if (err.message.includes('401')) window.location.href = '/auth.html'; // Changed from /index.html
                                     }
                                 });
                             });
@@ -655,7 +655,7 @@
                                     } catch (err) {
                                         console.error('Comprehension fetch error:', err.message);
                                         alert('Failed to submit comprehension: ' + err.message);
-                                        if (err.message.includes('401')) window.location.href = '/index.html';
+                                        if (err.message.includes('401')) window.location.href = '/auth.html'; // Changed from /index.html
                                     }
                                 });
                             });
@@ -736,7 +736,7 @@
                                         .catch(err => {
                                             console.error('Pronunciation save error:', err.message);
                                             alert('Failed to save pronunciation: ' + err.message);
-                                            if (err.message.includes('401')) window.location.href = '/index.html';
+                                            if (err.message.includes('401')) window.location.href = '/auth.html'; // Changed from /index.html
                                         });
                                     };
     
@@ -846,7 +846,7 @@
                                     } catch (err) {
                                         console.error('Quiz fetch error:', err.message);
                                         alert('Failed to submit quiz: ' + err.message);
-                                        if (err.message.includes('401')) window.location.href = '/index.html';
+                                        if (err.message.includes('401')) window.location.href = '/auth.html';
                                     }
                                 });
                             });
@@ -855,23 +855,23 @@
                     .catch(err => console.error('Error loading quizzes:', err));
     
                 // Load References
-                // Load References
-fetch('/api/references')
-    .then(res => {
-        if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
-        return res.json();
-    })
-    .then(references => {
-        console.log('References received:', references);
-        document.getElementById('referenceList').innerHTML = references.length > 0 
-            ? references.map(ref => `
-                <li>
-                    <a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}
-                </li>
-            `).join('')
-            : '<li>No references available</li>';
-    })
-    .catch(err => console.error('Error loading references:', err));
+                fetch('/api/references')
+                    .then(res => {
+                        if (!res.ok) throw new Error(`Failed to fetch references: ${res.status}`);
+                        return res.json();
+                    })
+                    .then(references => {
+                        console.log('References received:', references);
+                        document.getElementById('referenceList').innerHTML = references.length > 0 
+                            ? references.map(ref => `
+                                <li>
+                                    <a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}
+                                </li>
+                            `).join('')
+                            : '<li>No references available</li>';
+                    })
+                    .catch(err => console.error('Error loading references:', err));
+    
                 // Load Blog
                 fetch('/api/blogs')
                     .then(res => {
@@ -893,40 +893,41 @@ fetch('/api/references')
                     .catch(err => console.error('Error loading blogs:', err));
     
                 // Writing Submission Handler
-document.getElementById('submitWriting').addEventListener('click', async () => {
-    const text = document.getElementById('writingInput').value.trim();
-    if (!text) {
-        alert('Please write something first!');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/grade-writing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-        });
-        if (!response.ok) throw new Error('Grading failed');
-        const result = await response.json();
-
-        document.getElementById('writingFeedback').innerHTML = `
-            <p><strong>Score:</strong> ${result.score}/100</p>
-            <p><strong>CEFR Level:</strong> ${result.cefr}</p>
-            <p><strong>Feedback:</strong> ${result.feedback}</p>
-        `;
-    } catch (err) {
-        console.error('Writing grading error:', err);
-        alert('Failed to grade your writing: ' + err.message);
-    }
-});
-                    if (!localStorage.getItem('welcomeShown')) {
+                document.getElementById('submitWriting').addEventListener('click', async () => {
+                    const text = document.getElementById('writingInput').value.trim();
+                    if (!text) {
+                        alert('Please write something first!');
+                        return;
+                    }
+    
+                    try {
+                        const response = await fetch('/api/grade-writing', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text })
+                        });
+                        if (!response.ok) throw new Error('Grading failed');
+                        const result = await response.json();
+    
+                        document.getElementById('writingFeedback').innerHTML = `
+                            <p><strong>Score:</strong> ${result.score}/100</p>
+                            <p><strong>CEFR Level:</strong> ${result.cefr}</p>
+                            <p><strong>Feedback:</strong> ${result.feedback}</p>
+                        `;
+                    } catch (err) {
+                        console.error('Writing grading error:', err);
+                        alert('Failed to grade your writing: ' + err.message);
+                    }
+                });
+    
+                if (!localStorage.getItem('welcomeShown')) {
                     alert(`Welcome, ${currentUser.name || 'Learner'}! Check your progress on the leaderboard!`);
                     localStorage.setItem('welcomeShown', 'true');
                 }
             })
             .catch(err => {
                 console.error('Dashboard fetch error:', err.message);
-                if (err.message.includes('401')) window.location.href = '/index.html';
+                if (err.message.includes('401')) window.location.href = '/auth.html'; // Changed from /index.html
             });
     
         const backToTop = document.getElementById('backToTop');

@@ -4,9 +4,11 @@ const session = require('express-session');
 const MongoStore = require('connect-mongodb-session')(session);
 const bcrypt = require('bcrypt');
 const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey');
-// --- NEW: Added Nodemailer and crypto for email and token generation ---
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const axios = require('axios'); // Already present, just moved up for clarity
+require('dotenv').config(); // Already present, moved up
+
 const app = express();
 
 app.use(express.json());
@@ -20,15 +22,13 @@ const clientOptions = {
     maxPoolSize: 10
 };
 
-// --- NEW: Nodemailer setup with Mailtrap credentials ---
-// Replace these with your Mailtrap SMTP details from mailtrap.io
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,
     auth: {
-        user: process.env.EMAIL_USER, // e.g., '1a2b3c4d5e6f7g8h' from Mailtrap
-        pass: process.env.EMAIL_PASS,  // e.g., '9i8h7g6f5e4d3c2b' from Mailtrap
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
     }
 });
 
@@ -87,8 +87,22 @@ app.use(session({
     cookie: { maxAge: 1000 * 60 * 60 * 24 }
 }));
 
+// NEW: Middleware to protect routes
+const requireLogin = (req, res, next) => {
+    if (!req.session.userId) {
+        console.log('No session userId - access denied');
+        return res.status(401).send('Not logged in');
+    }
+    next();
+};
+
+// NEW: Middleware to protect dashboard.html
+app.get('/dashboard.html', requireLogin, (req, res) => {
+    res.sendFile(__dirname + '/public/dashboard.html');
+});
+
 function normalizeText(text) {
-    return text.toLowerCase().trim().replace(/’/g, "'"); // Normalize curly to straight apostrophe
+    return text.toLowerCase().trim().replace(/’/g, "'");
 }
 
 async function updateUserScore(userId, db) {
@@ -163,7 +177,6 @@ app.post('/api/login', async (req, res) => {
             console.log('Password mismatch for:', email);
             return res.status(401).send('Invalid credentials');
         }
-        // --- NEW: Check if user is verified before allowing login ---
         if (!user.isVerified) {
             console.log('User not verified:', email);
             return res.status(403).send('Please verify your email first.');
@@ -177,7 +190,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// --- NEW: Updated signup endpoint with email confirmation ---
 app.post('/api/signup', async (req, res) => {
     const { email, password, name } = req.body;
     console.log('Signup attempt:', { email });
@@ -191,7 +203,6 @@ app.post('/api/signup', async (req, res) => {
             return res.status(400).send('Email already in use');
         }
         const hashedPassword = await bcrypt.hash(password, 10);
-        // --- NEW: Generate a unique verification token ---
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const result = await users.insertOne({ 
             email, 
@@ -205,12 +216,11 @@ app.post('/api/signup', async (req, res) => {
             referencesVisited: [], 
             achievements: [], 
             admin: false,
-            verificationToken,  // Store token
-            isVerified: false   // Default to unverified
+            verificationToken,
+            isVerified: false
         });
         console.log('Signup successful:', email, 'User ID:', result.insertedId);
 
-        // --- NEW: Send verification email ---
         const confirmationUrl = `https://english-learning-website-olive.vercel.app/api/verify?token=${verificationToken}`;
         const mailOptions = {
             from: 'no-reply@englishlearning.com',
@@ -242,7 +252,6 @@ app.post('/api/signup', async (req, res) => {
     }
 });
 
-// --- NEW: Verification endpoint to confirm email ---
 app.get('/api/verify', async (req, res) => {
     const { token } = req.query;
     console.log('Verification attempt with token:', token);
@@ -260,14 +269,13 @@ app.get('/api/verify', async (req, res) => {
             { $set: { isVerified: true }, $unset: { verificationToken: "" } }
         );
         console.log('User verified:', user.email);
-        res.redirect('/dashboard.html'); // Redirect to dashboard after verification
+        res.redirect('/dashboard.html');
     } catch (err) {
         console.error('Verification error:', err.message);
         res.status(500).send('Verification failed.');
     }
 });
 
-// --- NEW: Password reset endpoint ---
 app.post('/api/reset-password', async (req, res) => {
     const { email } = req.body;
     console.log('Password reset request for:', email);
@@ -308,7 +316,6 @@ app.post('/api/reset-password', async (req, res) => {
     }
 });
 
-// --- NEW: Reset password page endpoint ---
 app.get('/api/reset-password', (req, res) => {
     const { token } = req.query;
     res.send(`
@@ -354,7 +361,6 @@ app.get('/api/reset-password', (req, res) => {
     `);
 });
 
-// --- NEW: Submit reset password endpoint ---
 app.post('/api/reset-password-submit', async (req, res) => {
     const { token, password } = req.body;
     console.log('Password reset submission for token:', token);
@@ -378,11 +384,12 @@ app.post('/api/reset-password-submit', async (req, res) => {
     }
 });
 
+// CHANGED: Allow /api/user-data for non-logged-in users
 app.get('/api/user-data', async (req, res) => {
     console.log('User data request, session:', req.session);
     if (!req.session.userId) {
-        console.log('No session userId');
-        return res.status(401).send('Not logged in');
+        console.log('No session userId - returning empty data');
+        return res.json({}); // CHANGED: Return empty object instead of 401
     }
     try {
         const db = await ensureDBConnection();
@@ -416,6 +423,7 @@ app.get('/api/user-data', async (req, res) => {
     }
 });
 
+// CHANGED: Made fully public (removed login check)
 app.get('/api/lessons', async (req, res) => {
     console.log('Lessons request');
     try {
@@ -430,6 +438,7 @@ app.get('/api/lessons', async (req, res) => {
     }
 });
 
+// CHANGED: Made fully public
 app.get('/api/references', async (req, res) => {
     console.log('References request');
     try {
@@ -444,6 +453,7 @@ app.get('/api/references', async (req, res) => {
     }
 });
 
+// CHANGED: Made fully public
 app.get('/api/blogs', async (req, res) => {
     console.log('Blogs request');
     try {
@@ -458,6 +468,7 @@ app.get('/api/blogs', async (req, res) => {
     }
 });
 
+// CHANGED: Made fully public
 app.get('/api/quizzes', async (req, res) => {
     console.log('Quizzes request');
     try {
@@ -472,6 +483,7 @@ app.get('/api/quizzes', async (req, res) => {
     }
 });
 
+// CHANGED: Made fully public
 app.get('/api/leaderboard', async (req, res) => {
     console.log('Leaderboard request');
     try {
@@ -494,12 +506,9 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
-app.post('/api/comprehension', async (req, res) => {
+// Kept login-required (updates user data)
+app.post('/api/comprehension', requireLogin, async (req, res) => {
     console.log('Comprehension request:', req.body);
-    if (!req.session.userId) {
-        console.log('No session userId');
-        return res.status(401).send('Not logged in');
-    }
     const { lessonId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
@@ -538,12 +547,9 @@ app.post('/api/comprehension', async (req, res) => {
     }
 });
 
-app.post('/api/homework', async (req, res) => {
+// Kept login-required
+app.post('/api/homework', requireLogin, async (req, res) => {
     console.log('Homework request:', req.body);
-    if (!req.session.userId) {
-        console.log('No session userId');
-        return res.status(401).send('Not logged in');
-    }
     const { lessonId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
@@ -584,12 +590,9 @@ app.post('/api/homework', async (req, res) => {
     }
 });
 
-app.post('/api/submit-quiz', async (req, res) => {
+// Kept login-required
+app.post('/api/submit-quiz', requireLogin, async (req, res) => {
     console.log('Quiz submission request:', req.body);
-    if (!req.session.userId) {
-        console.log('No session userId');
-        return res.status(401).send('Not logged in');
-    }
     const { quizId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
@@ -628,12 +631,9 @@ app.post('/api/submit-quiz', async (req, res) => {
     }
 });
 
-app.post('/api/pronunciation', async (req, res) => {
+// Kept login-required
+app.post('/api/pronunciation', requireLogin, async (req, res) => {
     console.log('Pronunciation request:', req.body);
-    if (!req.session.userId) {
-        console.log('No session userId');
-        return res.status(401).send('Not logged in');
-    }
     const { lessonId, phrase, isCorrect } = req.body;
     try {
         const db = await ensureDBConnection();
@@ -664,11 +664,7 @@ app.post('/api/pronunciation', async (req, res) => {
     }
 });
 
-
-require('dotenv').config(); // If not already there
-
-const axios = require('axios');
-
+// CHANGED: Made fully public
 function mapToCEFR(score, wordCount) {
     if (score < 20 || wordCount < 20) return { level: 'A1', reason: 'Basic vocabulary and structure, many errors' };
     if (score < 40 || wordCount < 50) return { level: 'A2', reason: 'Simple sentences, frequent errors' };
@@ -685,7 +681,6 @@ app.post('/api/grade-writing', async (req, res) => {
     try {
         console.log('Grading text:', text);
 
-        // Grammar (LanguageTool via direct HTTP)
         const ltResponse = await axios.post('https://api.languagetool.org/v2/check', {
             text: text,
             language: 'en-US',
@@ -697,31 +692,40 @@ app.post('/api/grade-writing', async (req, res) => {
         });
         console.log('Raw grammar result:', JSON.stringify(ltResponse.data, null, 2));
 
-        // Handle response
         const grammarCheck = ltResponse.data && ltResponse.data.matches ? ltResponse.data : { matches: [] };
         const errorCount = grammarCheck.matches.length;
-        let grammarScore = 100 - (errorCount * 10); // 10 points off per error
+        let grammarScore = 100 - (errorCount * 10);
         grammarScore = Math.max(0, grammarScore);
         const grammarFeedback = errorCount > 0 
             ? grammarCheck.matches.map(m => `${m.message} (e.g., "${m.context.text.substring(m.context.offset, m.context.offset + m.context.length)}")`).join('; ')
             : 'No grammar errors found!';
 
-        // Word Count & Complexity
         const wordCount = text.split(/\s+/).length;
         const sentenceCount = text.split(/[.!?]+/).length - 1 || 1;
         const avgWordsPerSentence = wordCount / sentenceCount;
         const wordCountBonus = Math.min(wordCount / 50, 1) * 30;
 
-        // Total Score
         const score = Math.round((grammarScore * 0.7) + (wordCountBonus * 0.3));
         const cefrData = mapToCEFR(score, wordCount);
 
-        // Feedback
         const feedback = `
             Your writing has ${wordCount} words and ${sentenceCount} sentences. 
             ${avgWordsPerSentence < 5 ? 'Try longer sentences for complexity.' : 'Good sentence length.'}
             ${grammarScore < 80 ? 'Check your grammar: ' + grammarFeedback : 'Solid grammar: ' + grammarFeedback}
         `;
+
+        // NEW: Save score if logged in
+        if (req.session.userId) {
+            const db = await ensureDBConnection();
+            if (db) {
+                const users = db.collection('users');
+                await users.updateOne(
+                    { _id: new ObjectId(req.session.userId) },
+                    { $push: { writingScores: { score, cefr: cefrData.level, timestamp: new Date() } } }
+                );
+                console.log('Writing score saved for user:', req.session.userId);
+            }
+        }
 
         res.json({ score, cefr: cefrData.level, feedback });
     } catch (error) {
@@ -736,6 +740,7 @@ app.post('/api/grade-writing', async (req, res) => {
         });
     }
 });
+
 app.get('/api/logout', (req, res) => {
     console.log('Logout attempt, session:', req.session);
     req.session.destroy((err) => {
@@ -746,6 +751,18 @@ app.get('/api/logout', (req, res) => {
         console.log('Logout successful');
         res.redirect('/index.html');
     });
+});
+
+// NEW: Optional endpoint for index.html to check login status
+app.get('/api/user-check', async (req, res) => {
+    if (req.session.userId) {
+        const db = await ensureDBConnection();
+        if (!db) return res.json({ loggedIn: true, name: 'Fallback User' });
+        const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
+        res.json({ loggedIn: true, name: user?.name || 'Unknown User' });
+    } else {
+        res.json({ loggedIn: false });
+    }
 });
 
 app.listen(3000, () => console.log('Server running on http://localhost:3000'));
