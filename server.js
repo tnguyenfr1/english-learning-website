@@ -384,6 +384,23 @@ app.post('/api/reset-password-submit', async (req, res) => {
     }
 });
 
+app.get('/api/user-progress', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
+    const db = await ensureDBConnection();
+    const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
+    const progress = [];
+    if (user.writingScores) {
+        progress.push(...user.writingScores.map(s => ({
+            activity: 'Writing',
+            score: s.score,
+            cefr: s.cefr,
+            timestamp: s.timestamp
+        })));
+    }
+    // Add more progress types (e.g., quizzes, homework) as needed
+    res.json(progress);
+});
+
 // CHANGED: Allow /api/user-data for non-logged-in users
 app.get('/api/user-data', async (req, res) => {
     console.log('User data request, session:', req.session);
