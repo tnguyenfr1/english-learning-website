@@ -2,60 +2,423 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>English Learning</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css"> <!-- Ensure this path matches your CSS -->
 </head>
 <body>
     <header>
-        <h1>Welcome to English Learning</h1>
-        <button id="authBtn">Sign Up / Log In</button>
+        <h1>Welcome to English Learning, <span id="username">Friend</span>!</h1>
+        <a href="/auth.html" id="authLink">Sign Up / Log In</a>
     </header>
-    <main>
-        <section id="lessons">
-            <h2>Lessons</h2>
-            <ul id="lessonList"></ul>
-        </section>
-        <section id="writing">
-            <h2>Writing Practice</h2>
-            <textarea id="writingInput"></textarea>
-            <button id="gradeWriting">Submit for Grading</button>
-            <div id="writingFeedback"></div>
-        </section>
-    </main>
-    <script>
-        // Fetch lessons (public)
-        fetch('/api/lessons')
-            .then(res => res.json())
-            .then(data => {
-                const lessonList = document.getElementById('lessonList');
-                data.forEach(lesson => {
-                    const li = document.createElement('li');
-                    li.textContent = lesson.title;
-                    lessonList.appendChild(li);
-                });
-            });
+    <div class="container">
+        <nav class="toc">
+            <a href="#leaderboard" class="active">Leaderboard</a>
+            <a href="#lessons">Lessons</a>
+            <a href="#quizzes">Quizzes</a>
+            <a href="#writing">Writing</a>
+            <a href="#references">References</a>
+            <a href="#blog">Blog</a>
+        </nav>
+        <div class="content">
+            <p id="breadcrumb">Home</p>
+            <section id="leaderboard" class="active">
+                <h2>Leaderboard</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Position</th>
+                            <th>Name</th>
+                            <th>Total Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody"></tbody>
+                </table>
+            </section>
+            <section id="lessons">
+                <h2>Lessons</h2>
+                <select id="levelFilter">
+                    <option value="">All Levels</option>
+                    <option value="A1">A1</option>
+                    <option value="A2">A2</option>
+                    <option value="B1">B1</option>
+                    <option value="B2">B2</option>
+                    <option value="C1">C1</option>
+                    <option value="C2">C2</option>
+                </select>
+                <select id="lessonJump">
+                    <option value="">Jump to Lesson</option>
+                </select>
+                <div id="lessonList"></div>
+            </section>
+            <section id="quizzes">
+                <h2>Quizzes</h2>
+                <div id="quizList"></div>
+            </section>
+            <section id="writing">
+                <h2>Writing Practice</h2>
+                <textarea id="writingInput" rows="10" placeholder="Write here..."></textarea>
+                <button id="submitWriting">Submit</button>
+                <div id="writingFeedback"></div>
+            </section>
+            <section id="references">
+                <h2>References</h2>
+                <ul id="referenceList"></ul>
+            </section>
+            <section id="blog">
+                <h2>Blog</h2>
+                <div id="blogList"></div>
+            </section>
+        </div>
+    </div>
+    <button id="backToTop" style="display: none;">Back to Top</button>
 
-        // Writing grading (public)
-        document.getElementById('gradeWriting').addEventListener('click', () => {
-            const text = document.getElementById('writingInput').value;
-            fetch('/api/grade-writing', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text })
-            })
+    <script>
+        // Check login status
+        fetch('/api/user-check')
             .then(res => res.json())
             .then(data => {
-                document.getElementById('writingFeedback').innerHTML = `
-                    Score: ${data.score}/100<br>
-                    CEFR: ${data.cefr}<br>
-                    Feedback: ${data.feedback}
-                `;
+                if (data.loggedIn) {
+                    document.getElementById('username').textContent = data.name;
+                    document.getElementById('authLink').textContent = 'Log Out';
+                    document.getElementById('authLink').href = '#';
+                    document.getElementById('authLink').addEventListener('click', (e) => {
+                        e.preventDefault();
+                        fetch('/api/logout', { method: 'GET' })
+                            .then(() => window.location.reload())
+                            .catch(err => console.error('Logout error:', err));
+                    });
+                }
+            })
+            .catch(err => console.error('User check error:', err));
+
+        // Tab navigation
+        document.querySelectorAll('.toc a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').substring(1);
+                const targetSection = document.getElementById(targetId);
+                if (targetSection) {
+                    document.querySelectorAll('.content section').forEach(section => section.classList.remove('active'));
+                    document.querySelectorAll('.toc a').forEach(a => a.classList.remove('active'));
+                    targetSection.classList.add('active');
+                    link.classList.add('active');
+                    document.getElementById('breadcrumb').textContent = `Home > ${link.textContent}`;
+                }
             });
         });
 
-        // Auth redirect
-        document.getElementById('authBtn').addEventListener('click', () => {
-            window.location.href = '/auth.html';
+        // Leaderboard (public version)
+        fetch('/api/leaderboard')
+            .then(res => res.json())
+            .then(users => {
+                const leaderboardBody = document.getElementById('leaderboardBody');
+                leaderboardBody.innerHTML = users.map((user, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${user.name}</td>
+                        <td>${user.score}%</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="3">No users ranked yet</td></tr>';
+            })
+            .catch(err => console.error('Leaderboard error:', err));
+
+        // Lessons (interactive, public)
+        fetch('/api/lessons')
+            .then(res => res.json())
+            .then(lessons => {
+                const lessonList = document.getElementById('lessonList');
+                const lessonJump = document.getElementById('lessonJump');
+                const levelFilter = document.getElementById('levelFilter');
+
+                function renderLessons(filterLevel) {
+                    lessonList.innerHTML = lessons
+                        .filter(lesson => !filterLevel || lesson.level === filterLevel)
+                        .map(lesson => `
+                            <details class="lesson" id="lesson-${lesson._id}">
+                                <summary>${lesson.title} (${lesson.level})</summary>
+                                <div class="lesson-content">
+                                    <h3>Reading Section</h3>
+                                    <p>${lesson.content}</p>
+                                    ${lesson.comprehension?.questions?.length > 0 ? `
+                                        <h4>Reading Comprehension</h4>
+                                        <form class="comprehensionForm" data-lesson-id="${lesson._id}">
+                                            ${lesson.comprehension.questions.map((q, i) => `
+                                                <p>${q.question}</p>
+                                                <label><input type="radio" name="answer${i}" value="true" required> Yes/True</label>
+                                                <label><input type="radio" name="answer${i}" value="false"> No/False</label>
+                                            `).join('')}
+                                            <button type="submit">Submit (Login to Save)</button>
+                                        </form>
+                                    ` : ''}
+                                    ${lesson.homework ? `
+                                        <h4>Homework (${lesson.level})</h4>
+                                        <form class="homeworkForm" data-lesson-id="${lesson._id}">
+                                            ${lesson.homework.map((q, i) => `
+                                                <p>${q.question}</p>
+                                                ${q.type === 'fill-in' ? `
+                                                    <input type="text" name="answer${i}" required>
+                                                ` : `
+                                                    <select name="answer${i}" required>
+                                                        ${q.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                                                    </select>
+                                                `}
+                                            `).join('')}
+                                            <button type="submit">Submit (Login to Save)</button>
+                                        </form>
+                                    ` : ''}
+                                    ${lesson.pronunciation ? `
+                                        <h4>Pronunciation</h4>
+                                        ${lesson.pronunciation.map((p, i) => `
+                                            <p>${p.phrase}</p>
+                                            <button class="recordButton" data-phrase="${p.phrase}" data-lesson-id="${lesson._id}" data-result-id="result-${lesson._id}-${i}">Record (Login to Save)</button>
+                                            <span id="result-${lesson._id}-${i}"></span>
+                                        `).join('')}
+                                    ` : ''}
+                                </div>
+                            </details>
+                        `).join('');
+                    attachHandlers();
+                }
+
+                renderLessons('');
+                lessons.forEach(lesson => {
+                    const option = document.createElement('option');
+                    option.value = `lesson-${lesson._id}`;
+                    option.textContent = `${lesson.title} (${lesson.level})`;
+                    lessonJump.appendChild(option);
+                });
+                lessonJump.addEventListener('change', (e) => {
+                    const targetId = e.target.value;
+                    const target = document.getElementById(targetId);
+                    if (target) {
+                        document.querySelectorAll('.content section').forEach(s => s.classList.remove('active'));
+                        document.querySelectorAll('.toc a').forEach(a => a.classList.remove('active'));
+                        document.getElementById('lessons').classList.add('active');
+                        document.querySelector('.toc a[href="#lessons"]').classList.add('active');
+                        target.scrollIntoView({ behavior: 'smooth' });
+                        target.open = true;
+                    }
+                    e.target.value = '';
+                });
+                levelFilter.addEventListener('change', (e) => renderLessons(e.target.value));
+
+                function attachHandlers() {
+                    document.querySelectorAll('.homeworkForm').forEach(form => {
+                        form.addEventListener('submit', async (e) => {
+                            e.preventDefault();
+                            const lessonId = form.dataset.lessonId;
+                            const answers = Array.from(form.querySelectorAll('input, select')).map(input => input.value);
+                            try {
+                                const res = await fetch('/api/homework', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ lessonId, answers })
+                                });
+                                if (!res.ok) throw new Error(await res.text());
+                                const result = await res.json();
+                                alert(`Score: ${Math.round((result.score / result.total) * 100)}%\n${result.feedback.map(f => `${f.question}: ${f.correct ? 'Correct' : `Wrong (${f.correctAnswer})`}`).join('\n')}`);
+                            } catch (err) {
+                                if (err.message.includes('401')) {
+                                    if (confirm('Login to save your score?')) window.location.href = '/auth.html';
+                                } else {
+                                    alert('Homework submission failed: ' + err.message);
+                                }
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.comprehensionForm').forEach(form => {
+                        form.addEventListener('submit', async (e) => {
+                            e.preventDefault();
+                            const lessonId = form.dataset.lessonId;
+                            const answers = Array.from(form.querySelectorAll('input:checked')).map(input => input.value === 'true');
+                            try {
+                                const res = await fetch('/api/comprehension', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ lessonId, answers })
+                                });
+                                if (!res.ok) throw new Error(await res.text());
+                                const result = await res.json();
+                                alert(`Score: ${Math.round((result.score / result.total) * 100)}%\n${result.feedback.map(f => `${f.question}: ${f.correct ? 'Correct' : `Wrong (${f.correctAnswer ? 'Yes' : 'No'})`}`).join('\n')}`);
+                            } catch (err) {
+                                if (err.message.includes('401')) {
+                                    if (confirm('Login to save your score?')) window.location.href = '/auth.html';
+                                } else {
+                                    alert('Comprehension failed: ' + err.message);
+                                }
+                            }
+                        });
+                    });
+
+                    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                    recognition.lang = 'en-US';
+                    let isRecognizing = false;
+
+                    document.querySelectorAll('.recordButton').forEach(button => {
+                        button.addEventListener('click', () => {
+                            if (isRecognizing) return;
+                            const phrase = button.dataset.phrase;
+                            const lessonId = button.dataset.lessonId;
+                            const resultSpan = document.getElementById(button.dataset.resultId);
+                            recognition.start();
+                            isRecognizing = true;
+                            button.disabled = true;
+                            resultSpan.textContent = 'Listening...';
+
+                            recognition.onresult = async (event) => {
+                                const spokenText = event.results[0][0].transcript.toLowerCase().trim();
+                                const isCorrect = spokenText === phrase.toLowerCase().trim();
+                                resultSpan.textContent = isCorrect ? 'Correct!' : `Try again: "${spokenText}"`;
+                                isRecognizing = false;
+                                button.disabled = false;
+                                try {
+                                    await fetch('/api/pronunciation', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ lessonId, phrase, isCorrect })
+                                    });
+                                } catch (err) {
+                                    if (err.message.includes('401')) {
+                                        if (confirm('Login to save your score?')) window.location.href = '/auth.html';
+                                    }
+                                }
+                            };
+
+                            recognition.onend = () => {
+                                isRecognizing = false;
+                                button.disabled = false;
+                            };
+                            recognition.onerror = (event) => {
+                                resultSpan.textContent = `Error: ${event.error}`;
+                                isRecognizing = false;
+                                button.disabled = false;
+                            };
+                        });
+                    });
+                }
+            })
+            .catch(err => console.error('Lessons error:', err));
+
+        // Quizzes (public)
+        fetch('/api/quizzes')
+            .then(res => res.json())
+            .then(quizzes => {
+                document.getElementById('quizList').innerHTML = quizzes.map(quiz => `
+                    <div class="quiz" data-id="${quiz._id}">
+                        <h3>${quiz.title} (${quiz.level})</h3>
+                        <p>Time: ${quiz.timeLimit}s</p>
+                        <button class="startQuiz" data-id="${quiz._id}">Start</button>
+                        <div class="quizContent" style="display: none;"></div>
+                    </div>
+                `).join('');
+
+                document.querySelectorAll('.startQuiz').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const quizId = button.dataset.id;
+                        const quiz = quizzes.find(q => q._id === quizId);
+                        const quizContent = button.nextElementSibling;
+                        quizContent.style.display = 'block';
+                        button.style.display = 'none';
+                        let timeLeft = quiz.timeLimit;
+                        quizContent.innerHTML = `
+                            <p>Time: <span id="timer-${quizId}">${timeLeft}</span>s</p>
+                            <form class="quizForm" data-id="${quizId}">
+                                ${quiz.questions.map((q, i) => `
+                                    <p>${q.prompt}</p>
+                                    <input type="text" name="answer${i}" required>
+                                `).join('')}
+                                <button type="submit">Submit (Login to Save)</button>
+                            </form>
+                        `;
+                        const timer = setInterval(() => {
+                            timeLeft--;
+                            document.getElementById(`timer-${quizId}`).textContent = timeLeft;
+                            if (timeLeft <= 0) {
+                                clearInterval(timer);
+                                document.querySelector(`form[data-id="${quizId}"]`).dispatchEvent(new Event('submit'));
+                            }
+                        }, 1000);
+
+                        document.querySelector(`form[data-id="${quizId}"]`).addEventListener('submit', async (e) => {
+                            e.preventDefault();
+                            clearInterval(timer);
+                            const answers = Array.from(e.target.querySelectorAll('input')).map(input => input.value);
+                            try {
+                                const res = await fetch('/api/submit-quiz', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ quizId, answers })
+                                });
+                                if (!res.ok) throw new Error(await res.text());
+                                const result = await res.json();
+                                alert(`Score: ${Math.round((result.score / result.total) * 100)}%\n${result.feedback.map(f => `${f.prompt}: ${f.correct ? 'Correct' : `Wrong (${f.correctAnswer})`}`).join('\n')}`);
+                            } catch (err) {
+                                if (err.message.includes('401')) {
+                                    if (confirm('Login to save your score?')) window.location.href = '/auth.html';
+                                } else {
+                                    alert('Quiz failed: ' + err.message);
+                                }
+                            }
+                        });
+                    });
+                });
+            })
+            .catch(err => console.error('Quizzes error:', err));
+
+        // Writing (public)
+        document.getElementById('submitWriting').addEventListener('click', async () => {
+            const text = document.getElementById('writingInput').value.trim();
+            if (!text) return alert('Write something first!');
+            try {
+                const res = await fetch('/api/grade-writing', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const result = await res.json();
+                document.getElementById('writingFeedback').innerHTML = `
+                    <p><strong>Score:</strong> ${result.score}/100</p>
+                    <p><strong>CEFR:</strong> ${result.cefr}</p>
+                    <p><strong>Feedback:</strong> ${result.feedback}</p>
+                `;
+            } catch (err) {
+                alert('Writing grading failed: ' + err.message);
+            }
+        });
+
+        // References (public)
+        fetch('/api/references')
+            .then(res => res.json())
+            .then(references => {
+                document.getElementById('referenceList').innerHTML = references.length
+                    ? references.map(ref => `<li><a href="${ref.url}" target="_blank">${ref.title}</a> - ${ref.description}</li>`).join('')
+                    : '<li>No references available</li>';
+            })
+            .catch(err => console.error('References error:', err));
+
+        // Blog (public)
+        fetch('/api/blogs')
+            .then(res => res.json())
+            .then(blogs => {
+                document.getElementById('blogList').innerHTML = blogs.map(blog => `
+                    <details class="blog-post">
+                        <summary>${blog.title}</summary>
+                        <p>${blog.content}</p>
+                        <small>Posted: ${new Date(blog.createdAt).toLocaleDateString()}</small>
+                    </details>
+                `).join('');
+            })
+            .catch(err => console.error('Blog error:', err));
+
+        // Back to Top
+        const backToTop = document.getElementById('backToTop');
+        document.querySelector('.content').addEventListener('scroll', () => {
+            backToTop.style.display = document.querySelector('.content').scrollTop > 300 ? 'block' : 'none';
+        });
+        backToTop.addEventListener('click', () => {
+            document.querySelector('.content').scrollTo({ top: 0, behavior: 'smooth' });
         });
     </script>
 </body>
