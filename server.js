@@ -425,17 +425,11 @@ app.get('/api/user-data', async (req, res) => {
 
 // CHANGED: Made fully public (removed login check)
 app.get('/api/lessons', async (req, res) => {
-    console.log('Lessons request');
-    try {
-        const db = await ensureDBConnection();
-        if (!db) return res.json([{ _id: '1', title: 'Sample Lesson 1', content: 'This is a sample lesson.', level: 'B1', createdAt: new Date() }]);
-        const lessons = await db.collection('lessons').find().sort({ createdAt: -1 }).toArray();
-        console.log('Lessons sent:', lessons.length);
-        res.json(lessons);
-    } catch (err) {
-        console.error('Lessons error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
-    }
+    console.time('Fetch Lessons');
+    const db = await ensureDBConnection();
+    const lessons = await db.collection('lessons').find({}).toArray();
+    console.timeEnd('Fetch Lessons');
+    res.json(lessons);
 });
 
 // CHANGED: Made fully public
