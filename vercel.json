@@ -8,11 +8,5 @@
     { "src": "/api/(.*)", "dest": "server.js" },
     { "src": "/dashboard.html", "dest": "server.js" },
     { "src": "/(.*)", "dest": "/public/$1", "headers": { "Cache-Control": "public, max-age=0, must-revalidate" } }
-  ],
-  "functions": {
-    "server.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  }
+  ]
 }
