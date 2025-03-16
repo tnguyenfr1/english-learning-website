@@ -315,12 +315,13 @@
             fetch('/api/lessons')
         .then(res => res.json())
         .then(lessons => {
+            console.log('Lessons fetched:', lessons); // Debug raw data
             const lessonList = document.getElementById('lessonList');
             const lessonJump = document.getElementById('lessonJump');
             const levelFilter = document.getElementById('levelFilter');
 
             function updateJumpOptions(filterLevel) {
-                console.log('Updating jump options for level:', filterLevel);
+                console.log('Updating jump options for level:', filterLevel, 'Lessons available:', lessons.length);
                 lessonJump.innerHTML = '<option value="">Jump to Lesson</option>';
                 lessons
                     .filter(lesson => !filterLevel || lesson.level === filterLevel)
@@ -381,13 +382,13 @@
                                 ` : ''}
                             </div>
                         </li>
-                    `).join('');
+                    `).join('') || '<li>No lessons available</li>';
                 console.timeEnd('Render Lessons');
+                updateJumpOptions(filterLevel); // Moved up
                 attachHandlers();
-                updateJumpOptions(filterLevel); // Ensure this runs after render
             }
 
-            renderLessons(''); // Initial render with no filter
+            renderLessons(''); // Initial render
             levelFilter.addEventListener('change', (e) => {
                 const selectedLevel = e.target.value;
                 console.log('Level filter changed to:', selectedLevel);
@@ -395,6 +396,7 @@
             });
             lessonJump.addEventListener('change', (e) => {
                 const targetId = e.target.value;
+                console.log('Jumping to lesson:', targetId);
                 const target = document.getElementById(targetId);
                 if (target) {
                     document.querySelectorAll('.content section').forEach(s => s.classList.remove('active'));
@@ -479,10 +481,16 @@
                     form.addEventListener('submit', submitHandler);
                 });
 
-                if (!recognition) {
-                    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-                    recognition.lang = 'en-US';
-                    recognition.continuous = false;
+                try {
+                    if (!recognition) {
+                        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                        recognition.lang = 'en-US';
+                        recognition.continuous = false;
+                        console.log('Speech recognition initialized');
+                    }
+                } catch (err) {
+                    console.error('Speech recognition not supported:', err);
+                    document.querySelectorAll('.recordButton').forEach(btn => btn.disabled = true);
                 }
                 let isRecognizing = false;
 
@@ -490,10 +498,11 @@
                     button.removeEventListener('click', button._clickHandler);
                     const clickHandler = (e) => {
                         e.stopPropagation();
-                        if (isRecognizing) return;
+                        if (isRecognizing || !recognition) return;
                         const phrase = button.dataset.phrase;
                         const lessonId = button.dataset.lessonId;
                         const resultSpan = document.getElementById(button.dataset.resultId);
+                        console.log('Recording started for phrase:', phrase);
                         recognition.start();
                         isRecognizing = true;
                         button.disabled = true;
@@ -516,12 +525,14 @@
                             isRecognizing = false;
                             button.disabled = false;
                             recognition.stop();
+                            console.log('Recording stopped');
                         };
                         recognition.onerror = (event) => {
                             resultSpan.textContent = `Error: ${event.error}`;
                             isRecognizing = false;
                             button.disabled = false;
                             recognition.stop();
+                            console.error('Recording error:', event.error);
                         };
                     };
                     button._clickHandler = clickHandler;
@@ -529,23 +540,16 @@
                 });
             }
         })
-        .catch(err => console.error('Lessons error:', err));
+        .catch(err => console.error('Lessons fetch error:', err));
 
     let quizQueue = [];
-    let activeQuizTimer = null; // Track active timer
+    let activeQuizTimer = null;
 
     function renderNextQuiz() {
         const quizList = document.getElementById('quizList');
+        console.log('Rendering quiz, queue length:', quizQueue.length);
         if (quizQueue.length === 0) {
-            quizList.innerHTML = '<p>No more quizzes available right now!</p>';
-            fetch('/api/quizzes')
-                .then(res => res.json())
-                .then(quizzes => {
-                    quizQueue = quizzes.slice();
-                    if (document.getElementById('quizzes').classList.contains('active')) {
-                        renderNextQuiz();
-                    }
-                });
+            quizList.innerHTML = '<p>No quizzes available right now!</p>';
             return;
         }
         const quiz = quizQueue.shift();
@@ -563,7 +567,7 @@
             </div>
         `;
         let timeLeft = quiz.timeLimit;
-        if (activeQuizTimer) clearInterval(activeQuizTimer); // Clear any old timer
+        if (activeQuizTimer) clearInterval(activeQuizTimer);
         activeQuizTimer = setInterval(() => {
             if (!document.getElementById('quizzes').classList.contains('active')) {
                 clearInterval(activeQuizTimer);
@@ -605,14 +609,12 @@
     fetch('/api/quizzes')
         .then(res => res.json())
         .then(quizzes => {
+            console.log('Quizzes fetched:', quizzes);
             quizQueue = quizzes.slice();
-            if (document.getElementById('quizzes').classList.contains('active')) {
-                renderNextQuiz();
-            }
+            renderNextQuiz(); // Initial render regardless of section
         })
-        .catch(err => console.error('Quizzes error:', err));
+        .catch(err => console.error('Quizzes fetch error:', err));
 
-    // TOC click to stop quiz timer if leaving section
     document.querySelectorAll('.toc a').forEach(link => {
         link.addEventListener('click', (e) => {
             // ... (existing TOC logic) ...
@@ -622,6 +624,8 @@
             }
         });
     });
+
+
 
         document.getElementById('submitWriting').addEventListener('click', async () => {
             const text = document.getElementById('writingInput').value.trim();
