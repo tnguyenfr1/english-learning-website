@@ -506,8 +506,8 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
-// Kept login-required (updates user data)
-app.post('/api/comprehension', requireLogin, async (req, res) => {
+// Public comprehension (feedback always, save if logged in)
+app.post('/api/comprehension', async (req, res) => {
     console.log('Comprehension request:', req.body);
     const { lessonId, answers } = req.body;
     try {
@@ -527,18 +527,21 @@ app.post('/api/comprehension', requireLogin, async (req, res) => {
         });
         const comprehensionScore = Math.round((score / lesson.comprehension.questions.length) * 100);
 
-        const users = db.collection('users');
-        const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
-        if (!user.comprehensionScores) user.comprehensionScores = [];
-        const existingScoreIndex = user.comprehensionScores.findIndex(s => s.lessonId.toString() === lessonId);
-        if (existingScoreIndex !== -1) {
-            user.comprehensionScores[existingScoreIndex].score = comprehensionScore;
-            user.comprehensionScores[existingScoreIndex].title = lesson.title;
-        } else {
-            user.comprehensionScores.push({ lessonId, score: comprehensionScore, title: lesson.title });
+        if (req.session.userId) {
+            const users = db.collection('users');
+            const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
+            if (!user.comprehensionScores) user.comprehensionScores = [];
+            const existingScoreIndex = user.comprehensionScores.findIndex(s => s.lessonId.toString() === lessonId);
+            if (existingScoreIndex !== -1) {
+                user.comprehensionScores[existingScoreIndex].score = comprehensionScore;
+                user.comprehensionScores[existingScoreIndex].title = lesson.title;
+            } else {
+                user.comprehensionScores.push({ lessonId, score: comprehensionScore, title: lesson.title });
+            }
+            await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { comprehensionScores: user.comprehensionScores } });
+            await updateUserScore(req.session.userId, db);
+            console.log('Comprehension saved for user:', req.session.userId);
         }
-        await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { comprehensionScores: user.comprehensionScores } });
-        await updateUserScore(req.session.userId, db);
         console.log('Comprehension processed:', { lessonId, comprehensionScore });
         res.json({ score: score, total: lesson.comprehension.questions.length, feedback });
     } catch (err) {
@@ -547,8 +550,8 @@ app.post('/api/comprehension', requireLogin, async (req, res) => {
     }
 });
 
-// Kept login-required
-app.post('/api/homework', requireLogin, async (req, res) => {
+// Public homework (feedback always, save if logged in)
+app.post('/api/homework', async (req, res) => {
     console.log('Homework request:', req.body);
     const { lessonId, answers } = req.body;
     try {
@@ -570,18 +573,21 @@ app.post('/api/homework', requireLogin, async (req, res) => {
         });
         const homeworkScore = Math.round((score / lesson.homework.length) * 100);
 
-        const users = db.collection('users');
-        const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
-        if (!user.homeworkScores) user.homeworkScores = [];
-        const existingScoreIndex = user.homeworkScores.findIndex(s => s.lessonId.toString() === lessonId);
-        if (existingScoreIndex !== -1) {
-            user.homeworkScores[existingScoreIndex].score = homeworkScore;
-            user.homeworkScores[existingScoreIndex].title = lesson.title;
-        } else {
-            user.homeworkScores.push({ lessonId, score: homeworkScore, title: lesson.title });
+        if (req.session.userId) {
+            const users = db.collection('users');
+            const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
+            if (!user.homeworkScores) user.homeworkScores = [];
+            const existingScoreIndex = user.homeworkScores.findIndex(s => s.lessonId.toString() === lessonId);
+            if (existingScoreIndex !== -1) {
+                user.homeworkScores[existingScoreIndex].score = homeworkScore;
+                user.homeworkScores[existingScoreIndex].title = lesson.title;
+            } else {
+                user.homeworkScores.push({ lessonId, score: homeworkScore, title: lesson.title });
+            }
+            await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { homeworkScores: user.homeworkScores } });
+            await updateUserScore(req.session.userId, db);
+            console.log('Homework saved for user:', req.session.userId);
         }
-        await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { homeworkScores: user.homeworkScores } });
-        await updateUserScore(req.session.userId, db);
         console.log('Homework processed:', { lessonId, homeworkScore });
         res.json({ score: score, total: lesson.homework.length, feedback });
     } catch (err) {
@@ -590,8 +596,8 @@ app.post('/api/homework', requireLogin, async (req, res) => {
     }
 });
 
-// Kept login-required
-app.post('/api/submit-quiz', requireLogin, async (req, res) => {
+// Public quiz submission (feedback always, save if logged in)
+app.post('/api/submit-quiz', async (req, res) => {
     console.log('Quiz submission request:', req.body);
     const { quizId, answers } = req.body;
     try {
@@ -611,18 +617,21 @@ app.post('/api/submit-quiz', requireLogin, async (req, res) => {
         });
         const quizScore = Math.round((score / quiz.questions.length) * 100);
 
-        const users = db.collection('users');
-        const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
-        if (!user.quizScores) user.quizScores = [];
-        const existingScoreIndex = user.quizScores.findIndex(s => s.quizId.toString() === quizId);
-        if (existingScoreIndex !== -1) {
-            user.quizScores[existingScoreIndex].score = quizScore;
-            user.quizScores[existingScoreIndex].title = quiz.title;
-        } else {
-            user.quizScores.push({ quizId, score: quizScore, title: quiz.title });
+        if (req.session.userId) {
+            const users = db.collection('users');
+            const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
+            if (!user.quizScores) user.quizScores = [];
+            const existingScoreIndex = user.quizScores.findIndex(s => s.quizId.toString() === quizId);
+            if (existingScoreIndex !== -1) {
+                user.quizScores[existingScoreIndex].score = quizScore;
+                user.quizScores[existingScoreIndex].title = quiz.title;
+            } else {
+                user.quizScores.push({ quizId, score: quizScore, title: quiz.title });
+            }
+            await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { quizScores: user.quizScores } });
+            await updateUserScore(req.session.userId, db);
+            console.log('Quiz saved for user:', req.session.userId);
         }
-        await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { quizScores: user.quizScores } });
-        await updateUserScore(req.session.userId, db);
         console.log('Quiz processed:', { quizId, quizScore });
         res.json({ score: score, total: quiz.questions.length, feedback });
     } catch (err) {
@@ -631,8 +640,8 @@ app.post('/api/submit-quiz', requireLogin, async (req, res) => {
     }
 });
 
-// Kept login-required
-app.post('/api/pronunciation', requireLogin, async (req, res) => {
+// Public pronunciation (feedback always, save if logged in)
+app.post('/api/pronunciation', async (req, res) => {
     console.log('Pronunciation request:', req.body);
     const { lessonId, phrase, isCorrect } = req.body;
     try {
@@ -644,19 +653,22 @@ app.post('/api/pronunciation', requireLogin, async (req, res) => {
             console.log('Lesson or phrase not found:', { lessonId, phrase });
             return res.status(404).send('Lesson or phrase not found');
         }
-        const users = db.collection('users');
-        const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
-        if (!user.pronunciationScores) user.pronunciationScores = [];
-        const existingScoreIndex = user.pronunciationScores.findIndex(s => s.lessonId.toString() === lessonId && s.phrase === phrase);
-        if (existingScoreIndex !== -1) {
-            user.pronunciationScores[existingScoreIndex].correct = isCorrect;
-            user.pronunciationScores[existingScoreIndex].attempts += 1;
-        } else {
-            user.pronunciationScores.push({ lessonId, phrase, correct: isCorrect, attempts: 1 });
+        if (req.session.userId) {
+            const users = db.collection('users');
+            const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
+            if (!user.pronunciationScores) user.pronunciationScores = [];
+            const existingScoreIndex = user.pronunciationScores.findIndex(s => s.lessonId.toString() === lessonId && s.phrase === phrase);
+            if (existingScoreIndex !== -1) {
+                user.pronunciationScores[existingScoreIndex].correct = isCorrect;
+                user.pronunciationScores[existingScoreIndex].attempts += 1;
+            } else {
+                user.pronunciationScores.push({ lessonId, phrase, correct: isCorrect, attempts: 1 });
+            }
+            await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { pronunciationScores: user.pronunciationScores } });
+            await updateUserScore(req.session.userId, db);
+            console.log('Pronunciation saved for user:', req.session.userId);
         }
-        await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { pronunciationScores: user.pronunciationScores } });
-        await updateUserScore(req.session.userId, db);
-        console.log('Pronunciation saved:', { lessonId, phrase, isCorrect });
+        console.log('Pronunciation processed:', { lessonId, phrase, isCorrect });
         res.send('Pronunciation recorded');
     } catch (err) {
         console.error('Pronunciation error:', err.message);
