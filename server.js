@@ -3,11 +3,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const session = require('express-session');
 const MongoStore = require('connect-mongodb-session')(session);
 const bcrypt = require('bcrypt');
-const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey');
+const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey'); // Replace with your actual key
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
-const axios = require('axios'); // Already present, just moved up for clarity
-require('dotenv').config(); // Already present, moved up
+const axios = require('axios');
+require('dotenv').config();
 
 const app = express();
 
@@ -19,7 +19,9 @@ console.log('Server starting...');
 const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster';
 const clientOptions = {
     serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
-    maxPoolSize: 10
+    maxPoolSize: 10,
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 45000
 };
 
 const transporter = nodemailer.createTransport({
@@ -28,7 +30,7 @@ const transporter = nodemailer.createTransport({
     secure: false,
     auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        pass: process.env.EMAIL_PASS
     }
 });
 
@@ -62,7 +64,7 @@ async function ensureDBConnection() {
         } catch (err) {
             console.error(`MongoDB connection attempt ${attempts} failed:`, err.message);
             if (attempts === maxRetries) {
-                console.error('Max retries reached, proceeding with fallback');
+                console.error('Max retries reached, returning null');
                 return null;
             }
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -80,23 +82,27 @@ const store = new MongoStore({
 store.on('error', (err) => console.error('Session store error:', err));
 
 app.use(session({
-    secret: 'your-secret-key',
+    secret: process.env.SESSION_SECRET || 'your-secret-key', // Use env variable
     resave: false,
     saveUninitialized: false,
     store: store,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 }
+    cookie: { 
+        maxAge: 1000 * 60 * 60 * 24, // 24 hours
+        secure: process.env.NODE_ENV === 'production', // Secure in production
+        httpOnly: true
+    }
 }));
 
-// NEW: Middleware to protect routes
+// Middleware to protect routes
 const requireLogin = (req, res, next) => {
     if (!req.session.userId) {
         console.log('No session userId - access denied');
-        return res.status(401).send('Not logged in');
+        return res.status(401).json({ error: 'Not logged in' });
     }
     next();
 };
 
-// NEW: Middleware to protect dashboard.html
+// Protect dashboard.html
 app.get('/dashboard.html', requireLogin, (req, res) => {
     res.sendFile(__dirname + '/public/dashboard.html');
 });
@@ -128,65 +134,51 @@ async function updateUserScore(userId, db) {
     await users.updateOne({ _id: new ObjectId(userId) }, { $set: { score } });
     console.log(`Updated user score: ${score}% (${completedTasks}/${totalTasks})`);
 
-    for (let i = 0; i < (user.homeworkScores?.length || 0); i++) {
-        if (!user.homeworkScores[i].title || user.homeworkScores[i].title === 'Untitled Lesson') {
-            const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(user.homeworkScores[i].lessonId) });
-            user.homeworkScores[i].title = lesson ? lesson.title : 'Unknown Lesson';
+    // Update titles
+    for (const scoreType of ['homeworkScores', 'comprehensionScores', 'quizScores']) {
+        if (user[scoreType]) {
+            for (let i = 0; i < user[scoreType].length; i++) {
+                if (!user[scoreType][i].title || user[scoreType][i].title === 'Untitled Lesson' || user[scoreType][i].title === 'Untitled Quiz') {
+                    const idField = scoreType === 'quizScores' ? 'quizId' : 'lessonId';
+                    const collection = scoreType === 'quizScores' ? 'quizzes' : 'lessons';
+                    const item = await db.collection(collection).findOne({ _id: new ObjectId(user[scoreType][i][idField]) });
+                    user[scoreType][i].title = item ? item.title : `Unknown ${collection.slice(0, -1)}`;
+                }
+            }
+            await users.updateOne({ _id: new ObjectId(userId) }, { $set: { [scoreType]: user[scoreType] } });
         }
     }
-    for (let i = 0; i < (user.comprehensionScores?.length || 0); i++) {
-        if (!user.comprehensionScores[i].title || user.comprehensionScores[i].title === 'Untitled Lesson') {
-            const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(user.comprehensionScores[i].lessonId) });
-            user.comprehensionScores[i].title = lesson ? lesson.title : 'Unknown Lesson';
-        }
-    }
-    for (let i = 0; i < (user.quizScores?.length || 0); i++) {
-        if (!user.quizScores[i].title || user.quizScores[i].title === 'Untitled Quiz') {
-            const quiz = await db.collection('quizzes').findOne({ _id: new ObjectId(user.quizScores[i].quizId) });
-            user.quizScores[i].title = quiz ? quiz.title : 'Unknown Quiz';
-        }
-    }
-    await users.updateOne({ _id: new ObjectId(userId) }, { 
-        $set: { 
-            homeworkScores: user.homeworkScores || [], 
-            comprehensionScores: user.comprehensionScores || [], 
-            quizScores: user.quizScores || [] 
-        } 
-    });
     console.log('Updated titles for user scores');
 }
 
+// Authentication Endpoints
 app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    console.log('Login attempt:', { email });
+    const { name, pin } = req.body; // Changed to match frontend
+    console.log('Login attempt:', { name });
     try {
         const db = await ensureDBConnection();
         if (!db) {
             console.log('DB not connected, using fallback login');
             req.session.userId = 'fallback-id';
-            return res.status(200).send();
+            return res.status(200).json({ message: 'Logged in with fallback' });
         }
         const users = db.collection('users');
-        const user = await users.findOne({ email });
+        const user = await users.findOne({ name });
         if (!user) {
-            console.log('User not found:', email);
-            return res.status(401).send('Invalid credentials');
+            console.log('User not found:', name);
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (!passwordMatch) {
-            console.log('Password mismatch for:', email);
-            return res.status(401).send('Invalid credentials');
-        }
-        if (!user.isVerified) {
-            console.log('User not verified:', email);
-            return res.status(403).send('Please verify your email first.');
+        const pinMatch = await bcrypt.compare(pin, user.pin); // Changed to pin
+        if (!pinMatch) {
+            console.log('Pin mismatch for:', name);
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
         req.session.userId = user._id.toString();
-        console.log('Login successful:', email, 'Session ID:', req.session.userId);
-        res.status(200).send();
+        console.log('Login successful:', name, 'Session ID:', req.session.userId);
+        res.status(200).json({ message: 'Login successful' });
     } catch (err) {
         console.error('Login error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable', details: err.message });
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
@@ -195,24 +187,27 @@ app.post('/api/signup', async (req, res) => {
     console.log('Signup attempt:', { email });
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable, signup failed' });
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
         const users = db.collection('users');
         const existingUser = await users.findOne({ email });
         if (existingUser) {
             console.log('Email already in use:', email);
-            return res.status(400).send('Email already in use');
+            return res.status(400).json({ error: 'Email already in use' });
         }
         const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPin = await bcrypt.hash('1234', 10); // Default PIN, adjust as needed
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const result = await users.insertOne({ 
             email, 
             password: hashedPassword, 
+            pin: hashedPin, // Added pin field
             name, 
             score: 0, 
             homeworkScores: [], 
             pronunciationScores: [], 
             comprehensionScores: [], 
-            quizScores: [], 
+            quizScores: [],
+            writingScores: [], // Added for writing
             referencesVisited: [], 
             achievements: [], 
             admin: false,
@@ -221,7 +216,7 @@ app.post('/api/signup', async (req, res) => {
         });
         console.log('Signup successful:', email, 'User ID:', result.insertedId);
 
-        const confirmationUrl = `https://english-learning-website-olive.vercel.app/api/verify?token=${verificationToken}`;
+        const confirmationUrl = `${process.env.BASE_URL || 'https://english-learning-website-olive.vercel.app'}/api/verify?token=${verificationToken}`;
         const mailOptions = {
             from: 'no-reply@englishlearning.com',
             to: email,
@@ -236,7 +231,7 @@ app.post('/api/signup', async (req, res) => {
                         <a href="${confirmationUrl}" style="background: #0071e3; color: #fff; padding: 12px 24px; text-decoration: none; font-size: 17px; font-weight: 700; border-radius: 10px; display: inline-block;">Verify Your Email</a>
                     </div>
                     <p style="font-size: 14px; color: #d1d1d1; text-align: center;">
-                        Keep this email—visit us anytime at <a href="https://english-learning-website-olive.vercel.app" style="color: #2997ff;">our site</a>!
+                        Keep this email—visit us anytime at <a href="${process.env.BASE_URL || 'https://english-learning-website-olive.vercel.app'}" style="color: #2997ff;">our site</a>!
                     </p>
                     <p style="font-size: 14px; color: #d1d1d1; text-align: center;">Cheers,<br>Thuan & Team</p>
                 </div>
@@ -248,7 +243,7 @@ app.post('/api/signup', async (req, res) => {
         res.status(201).json({ message: 'Signup successful! Check your email to verify.' });
     } catch (err) {
         console.error('Signup error:', err.message);
-        res.status(500).json({ error: 'Server error - Signup failed: ' + err.message });
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
@@ -272,7 +267,7 @@ app.get('/api/verify', async (req, res) => {
         res.redirect('/dashboard.html');
     } catch (err) {
         console.error('Verification error:', err.message);
-        res.status(500).send('Verification failed.');
+        res.status(500).send('Verification failed: ' + err.message);
     }
 });
 
@@ -289,7 +284,7 @@ app.post('/api/reset-password', async (req, res) => {
         const resetToken = crypto.randomBytes(32).toString('hex');
         await users.updateOne({ email }, { $set: { resetToken } });
 
-        const resetUrl = `https://english-learning-website-olive.vercel.app/api/reset-password?token=${resetToken}`;
+        const resetUrl = `${process.env.BASE_URL || 'https://english-learning-website-olive.vercel.app'}/api/reset-password?token=${resetToken}`;
         const mailOptions = {
             from: 'no-reply@englishlearning.com',
             to: email,
@@ -312,7 +307,7 @@ app.post('/api/reset-password', async (req, res) => {
         res.json({ message: 'Check your email for a password reset link.' });
     } catch (err) {
         console.error('Reset password error:', err.message);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
@@ -323,7 +318,7 @@ app.get('/api/reset-password', (req, res) => {
         <html>
         <head>
             <title>Reset Password</title>
-            <link rel="stylesheet" href="https://fonts.sandbox.google.com/css2?family=SF+Pro+Display:wght@400;700&display=swap">
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;700&display=swap">
             <style>
                 body { font-family: 'SF Pro Display', sans-serif; background: #1d1d1e; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
                 .reset-form { background: #2c2c2e; padding: 30px; border-radius: 18px; max-width: 380px; width: 100%; }
@@ -353,7 +348,7 @@ app.get('/api/reset-password', (req, res) => {
                     });
                     const result = await response.json();
                     alert(result.message || result.error);
-                    if (response.ok) window.location.href = '/index.html';
+                    if (response.ok) window.location.href = '/';
                 });
             </script>
         </body>
@@ -380,13 +375,23 @@ app.post('/api/reset-password-submit', async (req, res) => {
         res.json({ message: 'Password reset successful! Please log in.' });
     } catch (err) {
         console.error('Reset password submit error:', err.message);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
-// Update /api/user-progress
-app.get('/api/user-progress', async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
+// User Data and Progress
+app.get('/api/user-check', async (req, res) => {
+    if (req.session.userId) {
+        const db = await ensureDBConnection();
+        if (!db) return res.json({ loggedIn: true, name: 'Fallback User' });
+        const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
+        res.json({ loggedIn: true, name: user?.name || 'Unknown User' });
+    } else {
+        res.json({ loggedIn: false });
+    }
+});
+
+app.get('/api/user-progress', requireLogin, async (req, res) => {
     try {
         const db = await ensureDBConnection();
         if (!db) throw new Error('Database connection failed');
@@ -395,14 +400,14 @@ app.get('/api/user-progress', async (req, res) => {
         if (user.writingScores) {
             progress.push(...user.writingScores.map(s => ({
                 activity: 'Writing',
-                score: s.score, // Already a percentage
+                score: s.score,
                 cefr: s.cefr,
                 timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp || Date.now())
             })));
         }
         if (user.homeworkScores) {
             progress.push(...user.homeworkScores.map(s => ({
-                activity: `Homework (Lesson ${s.lessonId})`,
+                activity: `Homework (${s.title || 'Lesson ' + s.lessonId})`,
                 score: s.total ? Math.round((s.score / s.total) * 100) : 0,
                 cefr: null,
                 timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp || Date.now())
@@ -416,7 +421,15 @@ app.get('/api/user-progress', async (req, res) => {
                 timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp || Date.now())
             })));
         }
-        console.log('Returning progress:', progress);
+        if (user.quizScores) {
+            progress.push(...user.quizScores.map(s => ({
+                activity: `Quiz (${s.title || 'Quiz ' + s.quizId})`,
+                score: s.score,
+                cefr: null,
+                timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp || Date.now())
+            })));
+        }
+        console.log('Returning progress:', progress.length, 'entries');
         res.json(progress.sort((a, b) => b.timestamp - a.timestamp));
     } catch (error) {
         console.error('Progress error:', error.message, error.stack);
@@ -424,111 +437,69 @@ app.get('/api/user-progress', async (req, res) => {
     }
 });
 
-// CHANGED: Allow /api/user-data for non-logged-in users
-app.get('/api/user-data', async (req, res) => {
-    console.log('User data request, session:', req.session);
-    if (!req.session.userId) {
-        console.log('No session userId - returning empty data');
-        return res.json({}); // CHANGED: Return empty object instead of 401
-    }
-    try {
-        const db = await ensureDBConnection();
-        if (!db) return res.json({ name: 'Fallback User', score: 49, achievements: [{ name: 'Pronunciation Pro', dateEarned: new Date() }] });
-        const users = db.collection('users');
-        const lessons = await db.collection('lessons').find().toArray();
-        const quizzes = await db.collection('quizzes').find().toArray();
-        await updateUserScore(req.session.userId, db);
-        const user = await users.findOne({ _id: new ObjectId(req.session.userId) });
-        if (!user) {
-            console.log('User not found:', req.session.userId);
-            return res.status(404).send('User not found');
-        }
-        const data = {
-            name: user.name || 'Unknown User',
-            score: user.score || 0,
-            homeworkScores: user.homeworkScores || [],
-            pronunciationScores: user.pronunciationScores || [],
-            comprehensionScores: user.comprehensionScores || [],
-            quizScores: user.quizScores || [],
-            referencesVisited: user.referencesVisited || [],
-            achievements: user.achievements || [],
-            lessons: lessons.map(l => ({ homework: !!l.homework, comprehension: !!l.comprehension?.questions, pronunciation: !!l.pronunciation })),
-            quizzes: quizzes.map(q => ({ id: q._id }))
-        };
-        console.log('User data sent:', data);
-        res.json(data);
-    } catch (err) {
-        console.error('User data error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
-    }
-});
-
-// CHANGED: Made fully public (removed login check)
+// Public Endpoints
 app.get('/api/lessons', async (req, res) => {
     try {
         console.time('Fetch Lessons');
         const db = await ensureDBConnection();
-        if (!db) throw new Error('Database connection failed');
+        if (!db) return res.json([]); // Empty array fallback
         const lessons = await db.collection('lessons').find({}).toArray();
+        console.log('Lessons retrieved:', lessons.length);
         console.timeEnd('Fetch Lessons');
         res.json(lessons);
     } catch (error) {
-        console.error('Lessons error:', error.message, error.stack);
+        console.error('Lessons endpoint error:', {
+            message: error.message,
+            stack: error.stack,
+            request: req.session.userId ? 'Logged in' : 'Not logged in'
+        });
         res.status(500).json({ error: 'Failed to fetch lessons: ' + error.message });
     }
 });
 
-// CHANGED: Made fully public
 app.get('/api/references', async (req, res) => {
-    console.log('References request');
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.json([{ _id: '1', title: 'Sample Reference', url: 'https://example.com', description: 'A sample resource' }]);
+        if (!db) return res.json([]);
         const references = await db.collection('references').find().toArray();
         console.log('References sent:', references.length);
         res.json(references);
     } catch (err) {
         console.error('References error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        res.status(500).json({ error: 'Failed to fetch references: ' + err.message });
     }
 });
 
-// CHANGED: Made fully public
 app.get('/api/blogs', async (req, res) => {
-    console.log('Blogs request');
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.json([{ _id: '1', title: 'Sample Blog', content: 'This is a sample blog post.', createdAt: new Date() }]);
+        if (!db) return res.json([]);
         const blogs = await db.collection('blogs').find().sort({ createdAt: -1 }).toArray();
         console.log('Blogs sent:', blogs.length);
         res.json(blogs);
     } catch (err) {
         console.error('Blogs error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        res.status(500).json({ error: 'Failed to fetch blogs: ' + err.message });
     }
 });
 
-// CHANGED: Made fully public
 app.get('/api/quizzes', async (req, res) => {
-    console.log('Quizzes request');
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.json([{ _id: '1', title: 'Sample Quiz', type: 'fill-in', questions: [{ prompt: 'What is 2+2?', correctAnswer: '4' }], timeLimit: 60, level: 'B1', createdAt: new Date() }]);
+        if (!db) return res.json([]);
         const quizzes = await db.collection('quizzes').find().sort({ createdAt: -1 }).toArray();
         console.log('Quizzes sent:', quizzes.length);
         res.json(quizzes);
     } catch (err) {
         console.error('Quizzes error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        res.status(500).json({ error: 'Failed to fetch quizzes: ' + err.message });
     }
 });
 
-// CHANGED: Made fully public
 app.get('/api/leaderboard', async (req, res) => {
-    console.log('Leaderboard request');
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.json([{ name: 'Fallback User', score: 49 }]);
+        if (!db) return res.json([]);
         const users = await db.collection('users').find().toArray();
         for (const user of users) {
             await updateUserScore(user._id.toString(), db);
@@ -538,26 +509,23 @@ app.get('/api/leaderboard', async (req, res) => {
             .sort({ score: -1 })
             .limit(10)
             .toArray();
-        console.log('Leaderboard sent:', leaderboard);
+        console.log('Leaderboard sent:', leaderboard.length);
         res.json(leaderboard);
     } catch (err) {
         console.error('Leaderboard error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        res.status(500).json({ error: 'Failed to fetch leaderboard: ' + err.message });
     }
 });
 
-// Public comprehension (feedback always, save if logged in)
+// Activity Submission Endpoints
 app.post('/api/comprehension', async (req, res) => {
-    console.log('Comprehension request:', req.body);
     const { lessonId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
         if (!db) return res.status(500).json({ error: 'Database unavailable' });
-        const lessons = db.collection('lessons');
-        const lesson = await lessons.findOne({ _id: new ObjectId(lessonId) });
-        if (!lesson || !lesson.comprehension || !lesson.comprehension.questions) {
-            console.log('Lesson or comprehension questions not found:', lessonId);
-            return res.status(404).send('Lesson or comprehension questions not found');
+        const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(lessonId) });
+        if (!lesson || !lesson.comprehension?.questions) {
+            return res.status(404).json({ error: 'Lesson or comprehension questions not found' });
         }
         let score = 0;
         const feedback = lesson.comprehension.questions.map((q, i) => {
@@ -565,7 +533,6 @@ app.post('/api/comprehension', async (req, res) => {
             if (isCorrect) score++;
             return { question: q.question, correct: isCorrect, correctAnswer: q.correctAnswer };
         });
-        const comprehensionScore = Math.round((score / lesson.comprehension.questions.length) * 100);
 
         if (req.session.userId) {
             const users = db.collection('users');
@@ -573,35 +540,32 @@ app.post('/api/comprehension', async (req, res) => {
             if (!user.comprehensionScores) user.comprehensionScores = [];
             const existingScoreIndex = user.comprehensionScores.findIndex(s => s.lessonId.toString() === lessonId);
             if (existingScoreIndex !== -1) {
-                user.comprehensionScores[existingScoreIndex].score = comprehensionScore;
-                user.comprehensionScores[existingScoreIndex].title = lesson.title;
+                user.comprehensionScores[existingScoreIndex] = { lessonId, score, total: lesson.comprehension.questions.length, title: lesson.title, timestamp: new Date() };
             } else {
-                user.comprehensionScores.push({ lessonId, score: comprehensionScore, title: lesson.title });
+                user.comprehensionScores.push({ lessonId, score, total: lesson.comprehension.questions.length, title: lesson.title, timestamp: new Date() });
             }
             await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { comprehensionScores: user.comprehensionScores } });
             await updateUserScore(req.session.userId, db);
             console.log('Comprehension saved for user:', req.session.userId);
         }
-        console.log('Comprehension processed:', { lessonId, comprehensionScore });
-        res.json({ score: score, total: lesson.comprehension.questions.length, feedback });
+        res.json({ score, total: lesson.comprehension.questions.length, feedback });
     } catch (err) {
         console.error('Comprehension error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        res.status(500).json({ error: 'Failed to process comprehension: ' + err.message });
     }
 });
 
-// Public homework (feedback always, save if logged in)
 app.post('/api/homework', async (req, res) => {
     const { lessonId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
-        if (!db) throw new Error('Database connection failed');
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
         const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(lessonId) });
         if (!lesson || !lesson.homework) return res.status(404).json({ error: 'Lesson or homework not found' });
 
         const feedback = lesson.homework.map((q, i) => ({
             question: q.question,
-            correct: q.type === 'fill-in' ? answers[i].toLowerCase() === q.correctAnswer.toLowerCase() : answers[i] === q.correctAnswer,
+            correct: q.type === 'fill-in' ? normalizeText(answers[i]) === normalizeText(q.correctAnswer) : answers[i] === q.correctAnswer,
             correctAnswer: q.correctAnswer
         }));
         const score = feedback.filter(f => f.correct).length;
@@ -610,38 +574,32 @@ app.post('/api/homework', async (req, res) => {
         if (req.session.userId) {
             await db.collection('users').updateOne(
                 { _id: new ObjectId(req.session.userId) },
-                { $push: { homeworkScores: { lessonId, score, total, timestamp: new Date() } } }
+                { $push: { homeworkScores: { lessonId, score, total, title: lesson.title, timestamp: new Date() } } }
             );
-            console.log('Homework score saved for user:', req.session.userId);
+            await updateUserScore(req.session.userId, db);
+            console.log('Homework saved for user:', req.session.userId);
         }
-
         res.json({ score, total, feedback });
-    } catch (error) {
-        console.error('Homework error:', error.message, error.stack);
-        res.status(500).json({ error: 'Failed to process homework: ' + error.message });
+    } catch (err) {
+        console.error('Homework error:', err.message);
+        res.status(500).json({ error: 'Failed to process homework: ' + err.message });
     }
 });
 
-// Public quiz submission (feedback always, save if logged in)
 app.post('/api/submit-quiz', async (req, res) => {
-    console.log('Quiz submission request:', req.body);
     const { quizId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
         if (!db) return res.status(500).json({ error: 'Database unavailable' });
-        const quizzes = db.collection('quizzes');
-        const quiz = await quizzes.findOne({ _id: new ObjectId(quizId) });
-        if (!quiz || !quiz.questions) {
-            console.log('Quiz or questions not found:', quizId);
-            return res.status(404).send('Quiz or questions not found');
-        }
+        const quiz = await db.collection('quizzes').findOne({ _id: new ObjectId(quizId) });
+        if (!quiz || !quiz.questions) return res.status(404).json({ error: 'Quiz or questions not found' });
+
         let score = 0;
         const feedback = quiz.questions.map((q, i) => {
-            const isCorrect = answers[i] === q.correctAnswer;
+            const isCorrect = normalizeText(answers[i]) === normalizeText(q.correctAnswer);
             if (isCorrect) score++;
             return { prompt: q.prompt, correct: isCorrect, correctAnswer: q.correctAnswer };
         });
-        const quizScore = Math.round((score / quiz.questions.length) * 100);
 
         if (req.session.userId) {
             const users = db.collection('users');
@@ -649,24 +607,21 @@ app.post('/api/submit-quiz', async (req, res) => {
             if (!user.quizScores) user.quizScores = [];
             const existingScoreIndex = user.quizScores.findIndex(s => s.quizId.toString() === quizId);
             if (existingScoreIndex !== -1) {
-                user.quizScores[existingScoreIndex].score = quizScore;
-                user.quizScores[existingScoreIndex].title = quiz.title;
+                user.quizScores[existingScoreIndex] = { quizId, score, total: quiz.questions.length, title: quiz.title, timestamp: new Date() };
             } else {
-                user.quizScores.push({ quizId, score: quizScore, title: quiz.title });
+                user.quizScores.push({ quizId, score, total: quiz.questions.length, title: quiz.title, timestamp: new Date() });
             }
             await users.updateOne({ _id: new ObjectId(req.session.userId) }, { $set: { quizScores: user.quizScores } });
             await updateUserScore(req.session.userId, db);
             console.log('Quiz saved for user:', req.session.userId);
         }
-        console.log('Quiz processed:', { quizId, quizScore });
-        res.json({ score: score, total: quiz.questions.length, feedback });
+        res.json({ score, total: quiz.questions.length, feedback });
     } catch (err) {
         console.error('Quiz submission error:', err.message);
-        res.status(500).json({ error: 'Server error - DB may be unavailable' });
+        res.status(500).json({ error: 'Failed to process quiz: ' + err.message });
     }
 });
 
-// Public pronunciation (feedback always, save if logged in)
 app.post('/api/pronunciation', async (req, res) => {
     const { lessonId, phrase, isCorrect } = req.body;
     if (!lessonId || !phrase || isCorrect === undefined) {
@@ -674,26 +629,99 @@ app.post('/api/pronunciation', async (req, res) => {
     }
     try {
         const db = await ensureDBConnection();
-        if (!db) throw new Error('Database connection failed');
+        if (!db) return res.status(500).json({ error: 'Database unavailable' });
         if (req.session.userId) {
             await db.collection('users').updateOne(
                 { _id: new ObjectId(req.session.userId) },
                 { $push: { pronunciationScores: { lessonId, phrase, isCorrect, timestamp: new Date() } } }
             );
-            console.log('Pronunciation score saved for user:', req.session.userId);
+            await updateUserScore(req.session.userId, db);
+            console.log('Pronunciation saved for user:', req.session.userId);
         }
         res.json({ success: true });
-    } catch (error) {
-        console.error('Pronunciation error:', error.message, error.stack);
-        res.status(500).json({ error: 'Failed to save pronunciation: ' + error.message });
+    } catch (err) {
+        console.error('Pronunciation error:', err.message);
+        res.status(500).json({ error: 'Failed to process pronunciation: ' + err.message });
     }
 });
 
-// CHANGED: Made fully public
+app.post('/api/grade-writing', async (req, res) => {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'No text provided' });
+
+    try {
+        const ltResponse = await axios.post('https://api.languagetool.org/v2/check', {
+            text: text,
+            language: 'en-US',
+            disabledRules: 'WHITESPACE_RULE'
+        }, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 8000
+        });
+
+        const grammarCheck = ltResponse.data.matches || [];
+        const errorCount = grammarCheck.length;
+        let grammarScore = Math.max(0, 100 - (errorCount * 10));
+        const grammarFeedback = errorCount > 0 
+            ? grammarCheck.map(m => `${m.message} (e.g., "${m.context.text.substring(m.context.offset, m.context.offset + m.context.length)}")`)
+            : ['No grammar errors found!'];
+
+        const words = text.split(/\s+/).filter(w => w.length > 0);
+        const wordCount = words.length;
+        const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        const sentenceCount = sentences.length;
+        const avgWordsPerSentence = wordCount / sentenceCount;
+
+        const passiveVoiceCount = text.match(/\b(is|are|was|were|been)\s+\w+ed\b/gi)?.length || 0;
+        const uniqueWords = new Set(words.map(w => w.toLowerCase())).size;
+        const vocabVariety = uniqueWords / wordCount;
+        const styleFeedback = [];
+        if (passiveVoiceCount > sentenceCount * 0.2) styleFeedback.push('Too much passive voice—try active voice.');
+        if (vocabVariety < 0.7) styleFeedback.push('Use more varied vocabulary.');
+
+        const syllables = words.reduce((sum, word) => sum + (word.match(/[aeiouy]/gi)?.length || 1), 0);
+        const fleschScore = 206.835 - 1.015 * (wordCount / sentenceCount) - 84.6 * (syllables / wordCount);
+        const readabilityFeedback = fleschScore < 60 ? 'Text is hard to read—simplify sentences or words.' : 'Good readability!';
+
+        const wordCountBonus = Math.min(wordCount / 50, 1) * 30;
+        const styleScore = 100 - (passiveVoiceCount * 5 + (vocabVariety < 0.7 ? 10 : 0));
+        const totalScore = Math.round((grammarScore * 0.5) + (wordCountBonus * 0.3) + (styleScore * 0.2));
+        const cefrData = mapToCEFR(totalScore, wordCount, grammarScore, styleScore);
+
+        const feedback = [
+            `Words: ${wordCount}, Sentences: ${sentenceCount}, Avg. Words/Sentence: ${avgWordsPerSentence.toFixed(1)}`,
+            `Grammar (${grammarScore}%): ${grammarFeedback.join('; ')}`,
+            ...(styleFeedback.length ? [`Style (${styleScore}%): ${styleFeedback.join('; ')}`] : ['Style: No major issues.']),
+            `Readability: ${readabilityFeedback} (Flesch Score: ${fleschScore.toFixed(1)})`
+        ].join('\n');
+
+        if (req.session.userId) {
+            const db = await ensureDBConnection();
+            if (db) {
+                await db.collection('users').updateOne(
+                    { _id: new ObjectId(req.session.userId) },
+                    { $push: { writingScores: { score: totalScore, cefr: cefrData.level, timestamp: new Date() } } }
+                );
+                console.log('Writing score saved for user:', req.session.userId);
+            }
+        }
+
+        res.json({ score: totalScore, cefr: cefrData.level, feedback });
+    } catch (error) {
+        console.error('Grading error:', error.message);
+        const wordCount = text.split(/\s+/).length;
+        const score = Math.min(wordCount / 50 * 100, 100);
+        const cefrData = mapToCEFR(score, wordCount, 100, 100);
+        res.json({
+            score,
+            cefr: cefrData.level,
+            feedback: 'Grading failed—used basic score: ' + error.message
+        });
+    }
+});
+
 function mapToCEFR(score, wordCount, grammarScore, styleScore) {
     const reasons = [];
-
-    // Base CEFR on score ranges
     if (score < 20) {
         reasons.push('Very basic text with significant errors.');
         return { level: 'A1', reason: reasons.join(' ') };
@@ -715,127 +743,30 @@ function mapToCEFR(score, wordCount, grammarScore, styleScore) {
         return { level: 'C1', reason: reasons.join(' ') };
     }
     reasons.push('Near-native fluency with minimal errors.');
-    
-    // Adjust based on additional factors
-    if (wordCount < 50) reasons.push('Text is too short to show full ability—aim for 50+ words.');
+    if (wordCount < 50) reasons.push('Text too short—aim for 50+ words.');
     if (grammarScore < 70) reasons.push('Work on grammar accuracy.');
-    if (styleScore < 70) reasons.push('Improve style (e.g., less repetition, more active voice).');
-
+    if (styleScore < 70) reasons.push('Improve style.');
     return { level: 'C2', reason: reasons.join(' ') };
 }
 
-
-
-app.post('/api/grade-writing', async (req, res) => {
-    const { text } = req.body;
-    if (!text) return res.status(400).json({ error: 'No text provided' });
-
-    try {
-        console.log('Grading text:', text);
-
-        // LanguageTool Grammar Check
-        const ltResponse = await axios.post('https://api.languagetool.org/v2/check', {
-            text: text,
-            language: 'en-US',
-            disabledRules: 'WHITESPACE_RULE',
-            enabledOnly: 'false'
-        }, {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            timeout: 8000
-        });
-        console.log('Raw grammar result:', JSON.stringify(ltResponse.data, null, 2));
-
-        const grammarCheck = ltResponse.data && ltResponse.data.matches ? ltResponse.data : { matches: [] };
-        const errorCount = grammarCheck.matches.length;
-        let grammarScore = 100 - (errorCount * 10);
-        grammarScore = Math.max(0, grammarScore);
-        const grammarFeedback = errorCount > 0 
-            ? grammarCheck.matches.map(m => `${m.message} (e.g., "${m.context.text.substring(m.context.offset, m.context.offset + m.context.length)}")`)
-            : ['No grammar errors found!'];
-
-        // Text Stats
-        const words = text.split(/\s+/).filter(w => w.length > 0);
-        const wordCount = words.length;
-        const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-        const sentenceCount = sentences.length;
-        const avgWordsPerSentence = wordCount / sentenceCount;
-
-        // Style Checks
-        const passiveVoiceCount = text.match(/\b(is|are|was|were|been)\s+\w+ed\b/gi)?.length || 0;
-        const uniqueWords = new Set(words.map(w => w.toLowerCase())).size;
-        const vocabVariety = uniqueWords / wordCount;
-        const styleFeedback = [];
-        if (passiveVoiceCount > sentenceCount * 0.2) styleFeedback.push('Too much passive voice—try active voice (e.g., "The dog ate" vs. "Was eaten by the dog").');
-        if (vocabVariety < 0.7) styleFeedback.push('Use more varied vocabulary to avoid repetition.');
-
-        // Readability (Flesch Reading Ease, simplified)
-        const syllables = words.reduce((sum, word) => sum + (word.match(/[aeiouy]/gi)?.length || 1), 0);
-        const fleschScore = 206.835 - 1.015 * (wordCount / sentenceCount) - 84.6 * (syllables / wordCount);
-        const readabilityFeedback = fleschScore < 60 ? 'Text is hard to read—simplify sentences or words.' : 'Good readability!';
-
-        // Scoring
-        const wordCountBonus = Math.min(wordCount / 50, 1) * 30;
-        const styleScore = 100 - (passiveVoiceCount * 5 + (vocabVariety < 0.7 ? 10 : 0));
-        const totalScore = Math.round((grammarScore * 0.5) + (wordCountBonus * 0.3) + (styleScore * 0.2));
-        const cefrData = mapToCEFR(totalScore, wordCount);
-
-        // Feedback
-        const feedback = [
-            `Words: ${wordCount}, Sentences: ${sentenceCount}, Avg. Words/Sentence: ${avgWordsPerSentence.toFixed(1)}`,
-            `Grammar: ${grammarFeedback.join('; ')}`,
-            ...(styleFeedback.length ? [`Style: ${styleFeedback.join('; ')}`] : ['Style: No major issues.']),
-            `Readability: ${readabilityFeedback} (Flesch Score: ${fleschScore.toFixed(1)})`
-        ].join('\n');
-
-        // Save score if logged in
-        if (req.session.userId) {
-            const db = await ensureDBConnection();
-            if (db) {
-                const users = db.collection('users');
-                await users.updateOne(
-                    { _id: new ObjectId(req.session.userId) },
-                    { $push: { writingScores: { score: totalScore, cefr: cefrData.level, timestamp: new Date() } } }
-                );
-                console.log('Writing score saved for user:', req.session.userId);
-            }
-        }
-
-        res.json({ score: totalScore, cefr: cefrData.level, feedback });
-    } catch (error) {
-        console.error('Grading error:', error.message, error.stack);
-        const wordCount = text.split(/\s+/).length;
-        const score = Math.min(wordCount / 50 * 100, 100);
-        const cefrData = mapToCEFR(score, wordCount);
-        res.json({
-            score,
-            cefr: cefrData.level,
-            feedback: 'Grading failed—used basic score: ' + error.message
-        });
-    }
-});
-
 app.get('/api/logout', (req, res) => {
-    console.log('Logout attempt, session:', req.session);
     req.session.destroy((err) => {
         if (err) {
             console.error('Logout error:', err.message);
             return res.status(500).json({ error: 'Logout failed' });
         }
         console.log('Logout successful');
-        res.redirect('/index.html');
+        res.redirect('/');
     });
 });
 
-// NEW: Optional endpoint for index.html to check login status
-app.get('/api/user-check', async (req, res) => {
-    if (req.session.userId) {
-        const db = await ensureDBConnection();
-        if (!db) return res.json({ loggedIn: true, name: 'Fallback User' });
-        const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
-        res.json({ loggedIn: true, name: user?.name || 'Unknown User' });
-    } else {
-        res.json({ loggedIn: false });
-    }
-});
+// Start Server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
-app.listen(3000, () => console.log('Server running on http://localhost:3000'));
+// Graceful Shutdown
+process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, closing MongoDB connection');
+    if (client) await client.close();
+    process.exit(0);
+});
