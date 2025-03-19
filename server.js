@@ -3,7 +3,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const session = require('express-session');
 const MongoStore = require('connect-mongodb-session')(session);
 const bcrypt = require('bcrypt');
-const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey'); // Replace with your actual key
+const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey'); // Replace with your key
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const axios = require('axios');
@@ -82,18 +82,17 @@ const store = new MongoStore({
 store.on('error', (err) => console.error('Session store error:', err));
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key', // Use env variable
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
     store: store,
     cookie: { 
-        maxAge: 1000 * 60 * 60 * 24, // 24 hours
-        secure: process.env.NODE_ENV === 'production', // Secure in production
+        maxAge: 1000 * 60 * 60 * 24,
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true
     }
 }));
 
-// Middleware to protect routes
 const requireLogin = (req, res, next) => {
     if (!req.session.userId) {
         console.log('No session userId - access denied');
@@ -102,7 +101,6 @@ const requireLogin = (req, res, next) => {
     next();
 };
 
-// Protect dashboard.html
 app.get('/dashboard.html', requireLogin, (req, res) => {
     res.sendFile(__dirname + '/public/dashboard.html');
 });
@@ -134,7 +132,6 @@ async function updateUserScore(userId, db) {
     await users.updateOne({ _id: new ObjectId(userId) }, { $set: { score } });
     console.log(`Updated user score: ${score}% (${completedTasks}/${totalTasks})`);
 
-    // Update titles
     for (const scoreType of ['homeworkScores', 'comprehensionScores', 'quizScores']) {
         if (user[scoreType]) {
             for (let i = 0; i < user[scoreType].length; i++) {
@@ -151,10 +148,9 @@ async function updateUserScore(userId, db) {
     console.log('Updated titles for user scores');
 }
 
-// Authentication Endpoints
 app.post('/api/login', async (req, res) => {
-    const { name, pin } = req.body; // Changed to match frontend
-    console.log('Login attempt:', { name });
+    const { email, password } = req.body;
+    console.log('Login attempt:', { email });
     try {
         const db = await ensureDBConnection();
         if (!db) {
@@ -163,18 +159,22 @@ app.post('/api/login', async (req, res) => {
             return res.status(200).json({ message: 'Logged in with fallback' });
         }
         const users = db.collection('users');
-        const user = await users.findOne({ name });
+        const user = await users.findOne({ email });
         if (!user) {
-            console.log('User not found:', name);
+            console.log('User not found:', email);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
-        const pinMatch = await bcrypt.compare(pin, user.pin); // Changed to pin
-        if (!pinMatch) {
-            console.log('Pin mismatch for:', name);
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        if (!passwordMatch) {
+            console.log('Password mismatch for:', email);
             return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        if (!user.isVerified) {
+            console.log('User not verified:', email);
+            return res.status(403).json({ error: 'Please verify your email first' });
         }
         req.session.userId = user._id.toString();
-        console.log('Login successful:', name, 'Session ID:', req.session.userId);
+        console.log('Login successful:', email, 'Session ID:', req.session.userId);
         res.status(200).json({ message: 'Login successful' });
     } catch (err) {
         console.error('Login error:', err.message);
@@ -195,19 +195,17 @@ app.post('/api/signup', async (req, res) => {
             return res.status(400).json({ error: 'Email already in use' });
         }
         const hashedPassword = await bcrypt.hash(password, 10);
-        const hashedPin = await bcrypt.hash('1234', 10); // Default PIN, adjust as needed
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const result = await users.insertOne({ 
             email, 
             password: hashedPassword, 
-            pin: hashedPin, // Added pin field
             name, 
             score: 0, 
             homeworkScores: [], 
             pronunciationScores: [], 
             comprehensionScores: [], 
             quizScores: [],
-            writingScores: [], // Added for writing
+            writingScores: [],
             referencesVisited: [], 
             achievements: [], 
             admin: false,
@@ -760,11 +758,9 @@ app.get('/api/logout', (req, res) => {
     });
 });
 
-// Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
-// Graceful Shutdown
 process.on('SIGTERM', async () => {
     console.log('SIGTERM received, closing MongoDB connection');
     if (client) await client.close();
