@@ -173,30 +173,35 @@
         document.getElementById('toggle-auth').addEventListener('click', toggleAuth);
 
         document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            const endpoint = isLogin ? '/api/login' : '/api/signup';
-            const body = isLogin ? { email, password } : { email, password, name: email.split('@')[0] };
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const endpoint = isLogin ? '/api/login' : '/api/signup';
+    const body = isLogin ? { email, password } : { email, password, name: email.split('@')[0] };
 
-            try {
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Request failed');
-                if (isLogin) {
-                    window.location.href = '/dashboard.html';
-                } else {
-                    alert('Signup successful! Please check your email to verify your account.');
-                    toggleAuth();
-                }
-            } catch (err) {
-                document.getElementById('auth-error').textContent = err.message;
-            }
+    try {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include', // Ensure cookies are sent
+            body: JSON.stringify(body)
         });
+        console.log('Login response status:', res.status);
+        const data = await res.json();
+        console.log('Login response data:', data);
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        if (isLogin) {
+            console.log('Redirecting to dashboard');
+            window.location.href = '/dashboard.html';
+        } else {
+            alert('Signup successful! Please check your email to verify your account.');
+            toggleAuth();
+        }
+    } catch (err) {
+        console.error('Login error:', err);
+        document.getElementById('auth-error').textContent = err.message;
+    }
+});
 
         // Your existing script (unchanged except for console.log typo fix)
         document.querySelectorAll('.toc a').forEach(link => {

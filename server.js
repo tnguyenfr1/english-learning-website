@@ -88,8 +88,9 @@ app.use(session({
     store: store,
     cookie: { 
         maxAge: 1000 * 60 * 60 * 24,
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true
+        secure: process.env.NODE_ENV === 'production', // true on Vercel
+        httpOnly: true,
+        sameSite: 'lax' // Add this for cross-origin requests
     }
 }));
 
