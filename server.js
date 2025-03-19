@@ -154,28 +154,23 @@ app.post('/api/login', async (req, res) => {
     console.log('Login attempt:', { email });
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.log('DB not connected, using fallback login');
-            req.session.userId = 'fallback-id';
-            return res.status(200).json({ message: 'Logged in with fallback' });
-        }
+        if (!db) throw new Error('Database unavailable');
         const users = db.collection('users');
         const user = await users.findOne({ email });
-        if (!user) {
-            console.log('User not found:', email);
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
+        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
         const passwordMatch = await bcrypt.compare(password, user.password);
-        if (!passwordMatch) {
-            console.log('Password mismatch for:', email);
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-        if (!user.isVerified) {
-            console.log('User not verified:', email);
-            return res.status(403).json({ error: 'Please verify your email first' });
-        }
+        if (!passwordMatch) return res.status(401).json({ error: 'Invalid credentials' });
+        if (!user.isVerified) return res.status(403).json({ error: 'Please verify your email first' });
         req.session.userId = user._id.toString();
-        console.log('Login successful:', email, 'Session ID:', req.session.userId);
+        console.log('Set session ID:', req.session.userId);
+        // Force session save
+        await new Promise((resolve, reject) => {
+            req.session.save((err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('Session saved');
         res.status(200).json({ message: 'Login successful' });
     } catch (err) {
         console.error('Login error:', err.message);
@@ -459,13 +454,15 @@ app.get('/api/lessons', async (req, res) => {
 app.get('/api/references', async (req, res) => {
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.json([]);
-        const references = await db.collection('references').find().toArray();
-        console.log('References sent:', references.length);
+        if (!db) {
+            console.error('References: DB unavailable');
+            return res.status(500).json({ error: 'Database unavailable' });
+        }
+        const references = await db.collection('references').find({}).toArray();
         res.json(references);
     } catch (err) {
         console.error('References error:', err.message);
-        res.status(500).json({ error: 'Failed to fetch references: ' + err.message });
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
