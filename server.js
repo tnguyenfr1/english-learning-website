@@ -161,17 +161,28 @@ app.post('/api/login', async (req, res) => {
         const passwordMatch = await bcrypt.compare(password, user.password);
         if (!passwordMatch) return res.status(401).json({ error: 'Invalid credentials' });
         if (!user.isVerified) return res.status(403).json({ error: 'Please verify your email first' });
+
         req.session.userId = user._id.toString();
         console.log('Set session ID:', req.session.userId);
-        // Force session save
+
+        // Force session save and verify
         await new Promise((resolve, reject) => {
             req.session.save((err) => {
-                if (err) reject(err);
-                else resolve();
+                if (err) {
+                    console.error('Session save failed:', err.message);
+                    reject(err);
+                } else {
+                    console.log('Session saved successfully');
+                    resolve();
+                }
             });
         });
-        console.log('Session saved');
-        res.status(200).json({ message: 'Login successful' });
+
+        // Verify session in store
+        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+        console.log('Session in DB:', sessionDoc ? 'Found' : 'Not found');
+
+        res.status(200).json({ message: 'Login successful', userId: req.session.userId });
     } catch (err) {
         console.error('Login error:', err.message);
         res.status(500).json({ error: 'Server error: ' + err.message });
