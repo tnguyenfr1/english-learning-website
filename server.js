@@ -39,35 +39,22 @@ let db;
 
 async function initializeDB() {
     if (!client) {
+        console.log('Attempting MongoDB connection...');
         client = new MongoClient(mongoURI, clientOptions);
-        try {
-            await client.connect();
-            console.log('Connected to MongoDB Atlas via MongoClient');
-            db = client.db('english_learning');
-        } catch (err) {
-            console.error('Initial MongoDB connection failed:', err.message);
-            throw err;
-        }
+        await client.connect();
+        console.log('MongoDB connected');
+        db = client.db('english_learning');
     }
     return db;
 }
 
 async function ensureDBConnection() {
-    const maxRetries = 5;
-    let attempts = 0;
-    while (!db && attempts < maxRetries) {
-        attempts++;
+    if (!db) {
         try {
-            await initializeDB();
-            console.log(`MongoDB connected after ${attempts} attempts`);
-            return db;
+            return await initializeDB();
         } catch (err) {
-            console.error(`MongoDB connection attempt ${attempts} failed:`, err.message);
-            if (attempts === maxRetries) {
-                console.error('Max retries reached, returning null');
-                return null;
-            }
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            console.error('MongoDB connection failed:', err.message);
+            return null; // Fail fast instead of retrying
         }
     }
     return db;
@@ -76,9 +63,11 @@ async function ensureDBConnection() {
 const store = new MongoStore({
     uri: mongoURI,
     databaseName: 'english_learning',
-    collection: 'sessions'
+    collection: 'sessions',
+    connectionOptions: clientOptions
 });
 
+store.on('connected', () => console.log('MongoStore connected'));
 store.on('error', (err) => console.error('Session store error:', err));
 
 app.use(session({
@@ -154,7 +143,7 @@ app.post('/api/login', async (req, res) => {
     console.log('Login attempt:', { email });
     try {
         const db = await ensureDBConnection();
-        if (!db) throw new Error('Database unavailable');
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const users = db.collection('users');
         const user = await users.findOne({ email });
         if (!user) return res.status(401).json({ error: 'Invalid credentials' });
@@ -163,24 +152,19 @@ app.post('/api/login', async (req, res) => {
         if (!user.isVerified) return res.status(403).json({ error: 'Please verify your email first' });
 
         req.session.userId = user._id.toString();
-        console.log('Set session ID:', req.session.userId);
+        console.log('Session ID:', req.sessionID, 'User ID:', req.session.userId);
 
-        // Force session save and verify
         await new Promise((resolve, reject) => {
             req.session.save((err) => {
                 if (err) {
                     console.error('Session save failed:', err.message);
                     reject(err);
                 } else {
-                    console.log('Session saved successfully');
+                    console.log('Session saved');
                     resolve();
                 }
             });
         });
-
-        // Verify session in store
-        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session in DB:', sessionDoc ? 'Found' : 'Not found');
 
         res.status(200).json({ message: 'Login successful', userId: req.session.userId });
     } catch (err) {
@@ -386,11 +370,12 @@ app.post('/api/reset-password-submit', async (req, res) => {
 
 // User Data and Progress
 app.get('/api/user-check', async (req, res) => {
+    console.log('User check:', { sessionId: req.sessionID, userId: req.session.userId });
     if (req.session.userId) {
         const db = await ensureDBConnection();
-        if (!db) return res.json({ loggedIn: true, name: 'Fallback User' });
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
-        res.json({ loggedIn: true, name: user?.name || 'Unknown User' });
+        res.json({ loggedIn: true, name: user?.name || 'User' });
     } else {
         res.json({ loggedIn: false });
     }
@@ -445,20 +430,13 @@ app.get('/api/user-progress', requireLogin, async (req, res) => {
 // Public Endpoints
 app.get('/api/lessons', async (req, res) => {
     try {
-        console.time('Fetch Lessons');
         const db = await ensureDBConnection();
-        if (!db) return res.json([]); // Empty array fallback
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const lessons = await db.collection('lessons').find({}).toArray();
-        console.log('Lessons retrieved:', lessons.length);
-        console.timeEnd('Fetch Lessons');
         res.json(lessons);
-    } catch (error) {
-        console.error('Lessons endpoint error:', {
-            message: error.message,
-            stack: error.stack,
-            request: req.session.userId ? 'Logged in' : 'Not logged in'
-        });
-        res.status(500).json({ error: 'Failed to fetch lessons: ' + error.message });
+    } catch (err) {
+        console.error('Lessons error:', err.message);
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
@@ -506,21 +484,16 @@ app.get('/api/quizzes', async (req, res) => {
 app.get('/api/leaderboard', async (req, res) => {
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.json([]);
-        const users = await db.collection('users').find().toArray();
-        for (const user of users) {
-            await updateUserScore(user._id.toString(), db);
-        }
-        const leaderboard = await db.collection('users')
-            .find({}, { projection: { name: 1, score: 1 } })
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
+        const users = await db.collection('users')
+            .find({})
             .sort({ score: -1 })
             .limit(10)
             .toArray();
-        console.log('Leaderboard sent:', leaderboard.length);
-        res.json(leaderboard);
+        res.json(users.map(user => ({ name: user.name, score: user.score || 0 })));
     } catch (err) {
         console.error('Leaderboard error:', err.message);
-        res.status(500).json({ error: 'Failed to fetch leaderboard: ' + err.message });
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
