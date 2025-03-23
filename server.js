@@ -95,7 +95,7 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24,
         secure: process.env.NODE_ENV === 'production', // true on Vercel
         httpOnly: true,
-        sameSite: 'none' // Add this for cross-origin requests
+        sameSite: 'lax' // Add this for cross-origin requests
     }
 }));
 

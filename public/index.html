@@ -145,6 +145,14 @@
         // Authentication Handling
         let isLogin = true;
 
+        fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // Must send cookies
+    body: JSON.stringify({ email, password })
+});
+
+
         fetch('/api/user-check')
     .then(res => res.json())
     .then(data => {
