@@ -40,7 +40,12 @@ let db;
 async function initializeDB() {
     if (!client) {
         console.log('Attempting MongoDB connection...');
-        client = new MongoClient(mongoURI, clientOptions);
+        client = new MongoClient(mongoURI, {
+            serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
+            maxPoolSize: 10,
+            connectTimeoutMS: 5000, // 5s to avoid Vercel timeout
+            socketTimeoutMS: 10000 // 10s max
+        });
         await client.connect();
         console.log('MongoDB connected');
         db = client.db('english_learning');
@@ -48,14 +53,22 @@ async function initializeDB() {
     return db;
 }
 
+// Connect at startup
+(async () => {
+    try {
+        await initializeDB();
+    } catch (err) {
+        console.error('Initial MongoDB connection failed:', err.message);
+    }
+})();
+
 async function ensureDBConnection() {
     if (!db) {
-        try {
-            return await initializeDB();
-        } catch (err) {
-            console.error('MongoDB connection failed:', err.message);
-            return null; // Fail fast instead of retrying
-        }
+        console.error('DB not available - attempting reconnect');
+        return await initializeDB().catch(err => {
+            console.error('Reconnect failed:', err.message);
+            return null;
+        });
     }
     return db;
 }
@@ -64,7 +77,10 @@ const store = new MongoStore({
     uri: mongoURI,
     databaseName: 'english_learning',
     collection: 'sessions',
-    connectionOptions: clientOptions
+    connectionOptions: {
+        connectTimeoutMS: 5000,
+        socketTimeoutMS: 10000
+    }
 });
 
 store.on('connected', () => console.log('MongoStore connected'));
@@ -79,7 +95,7 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24,
         secure: process.env.NODE_ENV === 'production', // true on Vercel
         httpOnly: true,
-        sameSite: 'lax' // Add this for cross-origin requests
+        sameSite: 'none' // Add this for cross-origin requests
     }
 }));
 
@@ -166,11 +182,15 @@ app.post('/api/login', async (req, res) => {
             });
         });
 
-        res.status(200).json({ message: 'Login successful', userId: req.session.userId });
-    } catch (err) {
-        console.error('Login error:', err.message);
-        res.status(500).json({ error: 'Server error: ' + err.message });
-    }
+// Verify session in DB
+const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+console.log('Session in DB:', sessionDoc ? 'Found' : 'Not found');
+
+res.status(200).json({ message: 'Login successful', userId: req.session.userId });
+} catch (err) {
+console.error('Login error:', err.message);
+res.status(500).json({ error: 'Server error: ' + err.message });
+}
 });
 
 app.post('/api/signup', async (req, res) => {
