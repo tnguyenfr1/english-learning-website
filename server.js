@@ -20,8 +20,8 @@ const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://admin:securepassword1
 const clientOptions = {
     serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
     maxPoolSize: 10,
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 45000
+    connectTimeoutMS: 5000, // 5s for Vercel compatibility
+    socketTimeoutMS: 10000  // 10s max
 };
 
 const transporter = nodemailer.createTransport({
@@ -40,12 +40,7 @@ let db;
 async function initializeDB() {
     if (!client) {
         console.log('Attempting MongoDB connection...');
-        client = new MongoClient(mongoURI, {
-            serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
-            maxPoolSize: 10,
-            connectTimeoutMS: 5000, // 5s to avoid Vercel timeout
-            socketTimeoutMS: 10000 // 10s max
-        });
+        client = new MongoClient(mongoURI, clientOptions);
         await client.connect();
         console.log('MongoDB connected');
         db = client.db('english_learning');
@@ -53,22 +48,14 @@ async function initializeDB() {
     return db;
 }
 
-// Connect at startup
-(async () => {
-    try {
-        await initializeDB();
-    } catch (err) {
-        console.error('Initial MongoDB connection failed:', err.message);
-    }
-})();
-
 async function ensureDBConnection() {
     if (!db) {
-        console.error('DB not available - attempting reconnect');
-        return await initializeDB().catch(err => {
-            console.error('Reconnect failed:', err.message);
-            return null;
-        });
+        try {
+            return await initializeDB();
+        } catch (err) {
+            console.error('MongoDB connection failed:', err.message);
+            return null; // Let endpoints handle null gracefully
+        }
     }
     return db;
 }
@@ -77,10 +64,7 @@ const store = new MongoStore({
     uri: mongoURI,
     databaseName: 'english_learning',
     collection: 'sessions',
-    connectionOptions: {
-        connectTimeoutMS: 5000,
-        socketTimeoutMS: 10000
-    }
+    connectionOptions: clientOptions
 });
 
 store.on('connected', () => console.log('MongoStore connected'));
@@ -91,11 +75,11 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     store: store,
-    cookie: { 
-        maxAge: 1000 * 60 * 60 * 24,
-        secure: process.env.NODE_ENV === 'production', // true on Vercel
+    cookie: {
+        maxAge: 1000 * 60 * 60 * 24, // 1 day
+        secure: process.env.NODE_ENV === 'production', // False locally, true in prod
         httpOnly: true,
-        sameSite: 'lax' // Add this for cross-origin requests
+        sameSite: 'lax' // Works locally and in prod
     }
 }));
 
@@ -106,10 +90,6 @@ const requireLogin = (req, res, next) => {
     }
     next();
 };
-
-//app.get('/dashboard.html', requireLogin, (req, res) => {
-//    res.sendFile(__dirname + '/public/dashboard.html');
-//});
 
 function normalizeText(text) {
     return text.toLowerCase().trim().replace(/’/g, "'");
@@ -122,13 +102,13 @@ async function updateUserScore(userId, db) {
 
     const lessons = await db.collection('lessons').find().toArray();
     const quizzes = await db.collection('quizzes').find().toArray();
-    const totalTasks = 
-        lessons.filter(l => l.homework).length + 
-        lessons.filter(l => l.comprehension?.questions).length + 
-        lessons.filter(l => l.pronunciation).length + 
+    const totalTasks =
+        lessons.filter(l => l.homework).length +
+        lessons.filter(l => l.comprehension?.questions).length +
+        lessons.filter(l => l.pronunciation).length +
         quizzes.length;
 
-    const completedTasks = 
+    const completedTasks =
         (user.homeworkScores?.length || 0) +
         (user.comprehensionScores?.length || 0) +
         (user.pronunciationScores?.filter(s => s.correct).length || 0) +
@@ -182,15 +162,14 @@ app.post('/api/login', async (req, res) => {
             });
         });
 
-// Verify session in DB
-const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-console.log('Session in DB:', sessionDoc ? 'Found' : 'Not found');
+        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+        console.log('Session in DB:', sessionDoc ? 'Found' : 'Not found');
 
-res.status(200).json({ message: 'Login successful', userId: req.session.userId });
-} catch (err) {
-console.error('Login error:', err.message);
-res.status(500).json({ error: 'Server error: ' + err.message });
-}
+        res.status(200).json({ message: 'Login successful', userId: req.session.userId });
+    } catch (err) {
+        console.error('Login error:', err.message);
+        res.status(500).json({ error: 'Server error: ' + err.message });
+    }
 });
 
 app.post('/api/signup', async (req, res) => {
@@ -207,18 +186,18 @@ app.post('/api/signup', async (req, res) => {
         }
         const hashedPassword = await bcrypt.hash(password, 10);
         const verificationToken = crypto.randomBytes(32).toString('hex');
-        const result = await users.insertOne({ 
-            email, 
-            password: hashedPassword, 
-            name, 
-            score: 0, 
-            homeworkScores: [], 
-            pronunciationScores: [], 
-            comprehensionScores: [], 
+        const result = await users.insertOne({
+            email,
+            password: hashedPassword,
+            name,
+            score: 0,
+            homeworkScores: [],
+            pronunciationScores: [],
+            comprehensionScores: [],
             quizScores: [],
             writingScores: [],
-            referencesVisited: [], 
-            achievements: [], 
+            referencesVisited: [],
+            achievements: [],
             admin: false,
             verificationToken,
             isVerified: false
@@ -443,7 +422,7 @@ app.get('/api/user-progress', requireLogin, async (req, res) => {
         res.json(progress.sort((a, b) => b.timestamp - a.timestamp));
     } catch (error) {
         console.error('Progress error:', error.message, error.stack);
-        res.status(500).json({ error: 'Failed to fetch progress: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch progress: ' + err.message });
     }
 });
 
@@ -662,7 +641,7 @@ app.post('/api/grade-writing', async (req, res) => {
         const grammarCheck = ltResponse.data.matches || [];
         const errorCount = grammarCheck.length;
         let grammarScore = Math.max(0, 100 - (errorCount * 10));
-        const grammarFeedback = errorCount > 0 
+        const grammarFeedback = errorCount > 0
             ? grammarCheck.map(m => `${m.message} (e.g., "${m.context.text.substring(m.context.offset, m.context.offset + m.context.length)}")`)
             : ['No grammar errors found!'];
 
