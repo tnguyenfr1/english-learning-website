@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>English Learning Platform</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;700&display=swap">
-    <link rel="icon" href="/favicon.ico" type="image/x-icon"> <!-- Added favicon -->
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <style>
-        /* Your existing styles unchanged */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: 'SF Pro Display', -apple-system, sans-serif; 
@@ -145,31 +144,31 @@
         // Authentication Handling
         let isLogin = true;
 
-        fetch('/api/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include', // Must send cookies
-    body: JSON.stringify({ email, password })
-});
-
-
-        fetch('/api/user-check')
-    .then(res => res.json())
-    .then(data => {
-        console.log('Initial user check:', data);
-        const authLink = document.getElementById('authLink');
-        if (data.loggedIn) {
-            authLink.textContent = 'Dashboard';
-            authLink.href = '/dashboard.html';
-        } else {
-            authLink.textContent = 'Log In';
-            authLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.querySelector('.toc a[href="#auth"]').click();
-            });
+        async function checkUserStatus() {
+            try {
+                const res = await fetch('/api/user-check', {
+                    credentials: 'include' // Ensure cookies are sent
+                });
+                const data = await res.json();
+                console.log('Initial user check:', data);
+                const authLink = document.getElementById('authLink');
+                if (data.loggedIn) {
+                    authLink.textContent = 'Dashboard';
+                    authLink.href = '/dashboard.html';
+                } else {
+                    authLink.textContent = 'Log In';
+                    authLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        document.querySelector('.toc a[href="#auth"]').click();
+                    });
+                }
+            } catch (err) {
+                console.error('User check error:', err);
+                document.getElementById('auth-error').textContent = 'Failed to check login status';
+            }
         }
-    })
-    .catch(err => console.error('User check error:', err));
+
+        checkUserStatus();
 
         function toggleAuth() {
             isLogin = !isLogin;
@@ -182,43 +181,43 @@
         document.getElementById('toggle-auth').addEventListener('click', toggleAuth);
 
         document.getElementById('authForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    const endpoint = isLogin ? '/api/login' : '/api/signup';
-    const body = isLogin ? { email, password } : { email, password, name: email.split('@')[0] };
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const endpoint = isLogin ? '/api/login' : '/api/signup';
+            const body = isLogin ? { email, password } : { email, password, name: email.split('@')[0] };
 
-    try {
-        const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include', // Send cookies
-            body: JSON.stringify(body)
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include', // Ensure cookies are sent
+                    body: JSON.stringify(body)
+                });
+                console.log('Auth response status:', res.status);
+                const data = await res.json();
+                console.log('Auth response data:', data);
+
+                if (!res.ok) {
+                    throw new Error(data.error || `Request failed with status ${res.status}`);
+                }
+
+                if (isLogin) {
+                    console.log('Login successful, redirecting to dashboard with userId:', data.userId);
+                    document.getElementById('authLink').textContent = 'Dashboard';
+                    document.getElementById('authLink').href = '/dashboard.html';
+                    window.location.href = '/dashboard.html'; // Immediate redirect
+                } else {
+                    alert('Signup successful! Please check your email to verify your account.');
+                    toggleAuth();
+                }
+            } catch (err) {
+                console.error('Auth error:', err.message);
+                document.getElementById('auth-error').textContent = err.message;
+            }
         });
-        console.log('Login response status:', res.status);
-        const data = await res.json();
-        console.log('Login response data:', data);
-        if (!res.ok) throw new Error(data.error || 'Request failed');
-        if (isLogin) {
-            console.log('Redirecting to dashboard with userId:', data.userId);
-            // Update UI immediately
-            document.getElementById('authLink').textContent = 'Dashboard';
-            document.getElementById('authLink').href = '/dashboard.html';
-            // Force redirect
-            setTimeout(() => {
-                window.location.href = '/dashboard.html';
-            }, 100); // Small delay to ensure session sync
-        } else {
-            alert('Signup successful! Please check your email to verify your account.');
-            toggleAuth();
-        }
-    } catch (err) {
-        console.error('Login error:', err);
-        document.getElementById('auth-error').textContent = err.message;
-    }
-});
 
-        // Your existing script (unchanged except for console.log typo fix)
+        // Navigation
         document.querySelectorAll('.toc a').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -234,7 +233,8 @@
             });
         });
 
-        fetch('/api/leaderboard')
+        // Leaderboard
+        fetch('/api/leaderboard', { credentials: 'include' })
             .then(res => res.json())
             .then(users => {
                 document.getElementById('leaderboardBody').innerHTML = users.map((user, index) => `
@@ -243,6 +243,7 @@
             })
             .catch(err => console.error('Leaderboard error:', err));
 
+        // Speech Recognition
         let recognition;
         try {
             recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
@@ -254,7 +255,8 @@
             recognition = null;
         }
 
-        fetch('/api/lessons')
+        // Lessons
+        fetch('/api/lessons', { credentials: 'include' })
             .then(res => {
                 if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
                 return res.json();
@@ -394,6 +396,7 @@
                                 const res = await fetch('/api/homework', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
                                     body: JSON.stringify({ lessonId, answers })
                                 });
                                 if (!res.ok) throw new Error(await res.text());
@@ -418,6 +421,7 @@
                                 const res = await fetch('/api/comprehension', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
                                     body: JSON.stringify({ lessonId, answers })
                                 });
                                 if (!res.ok) throw new Error(await res.text());
@@ -464,6 +468,7 @@
                                     const res = await fetch('/api/pronunciation', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
+                                        credentials: 'include',
                                         body: JSON.stringify({ lessonId, phrase, isCorrect })
                                     });
                                     if (!res.ok) throw new Error(await res.text());
@@ -498,6 +503,7 @@
                 document.getElementById('lessonList').innerHTML = '<li>Failed to load lessons: ' + err.message + '</li>';
             });
 
+        // Quizzes
         let quizQueue = [];
         let activeQuizTimer = null;
 
@@ -548,6 +554,7 @@
                     const res = await fetch('/api/submit-quiz', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify({ quizId: quiz._id, answers })
                     });
                     if (!res.ok) throw new Error(await res.text());
@@ -562,7 +569,7 @@
             });
         }
 
-        fetch('/api/quizzes')
+        fetch('/api/quizzes', { credentials: 'include' })
             .then(res => res.json())
             .then(quizzes => {
                 console.log('Quizzes fetched:', quizzes);
@@ -580,6 +587,7 @@
             });
         });
 
+        // Writing
         document.getElementById('submitWriting').addEventListener('click', async () => {
             const text = document.getElementById('writingInput').value.trim();
             if (!text) return alert('Write something first!');
@@ -587,6 +595,7 @@
                 const res = await fetch('/api/grade-writing', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ text })
                 });
                 const result = await res.json();
@@ -600,7 +609,8 @@
             }
         });
 
-        fetch('/api/references')
+        // References
+        fetch('/api/references', { credentials: 'include' })
             .then(res => res.json())
             .then(references => {
                 document.getElementById('referenceList').innerHTML = references.length
@@ -609,7 +619,8 @@
             })
             .catch(err => console.error('References error:', err));
 
-        fetch('/api/blogs')
+        // Blog
+        fetch('/api/blogs', { credentials: 'include' })
             .then(res => res.json())
             .then(blogs => {
                 document.getElementById('blogList').innerHTML = blogs.map(blog => `
@@ -632,6 +643,7 @@
             })
             .catch(err => console.error('Blog error:', err));
 
+        // Back to Top
         const backToTop = document.getElementById('backToTop');
         document.querySelector('.content').addEventListener('scroll', () => {
             backToTop.style.display = document.querySelector('.content').scrollTop > 300 ? 'block' : 'none';

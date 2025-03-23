@@ -77,9 +77,9 @@ app.use(session({
     store: store,
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1 day
-        secure: process.env.NODE_ENV === 'production', // False locally, true in prod
+        secure: process.env.NODE_ENV === 'production', // True in prod (HTTPS)
         httpOnly: true,
-        sameSite: 'lax' // Works locally and in prod
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // 'none' for prod cross-origin
     }
 }));
 
