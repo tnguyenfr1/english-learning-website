@@ -107,9 +107,9 @@ const requireLogin = (req, res, next) => {
     next();
 };
 
-app.get('/dashboard.html', requireLogin, (req, res) => {
-    res.sendFile(__dirname + '/public/dashboard.html');
-});
+//app.get('/dashboard.html', requireLogin, (req, res) => {
+//    res.sendFile(__dirname + '/public/dashboard.html');
+//});
 
 function normalizeText(text) {
     return text.toLowerCase().trim().replace(/’/g, "'");
