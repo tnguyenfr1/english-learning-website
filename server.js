@@ -1,12 +1,8 @@
 const express = require('express');
 const session = require('express-session');
 const MongoStore = require('connect-mongodb-session')(session);
-const { MongoClient, ObjectId } = require('mongodb'); // Added ObjectId back
+const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
-const stripe = require('stripe')('sk_test_51YourActualStripeSecretKey');
-const nodemailer = require('nodemailer');
-const crypto = require('crypto');
-const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -15,37 +11,27 @@ app.use(express.static('public'));
 
 console.log('Server starting...');
 
-// MongoDB Setup
 const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster';
-let client; // Declare client globally but initialize in connectDB
-let db;     // Declare db globally
+let client;
+let db;
 
-// Centralized DB Connection Function
 async function connectDB() {
     if (!client) {
         console.log('Attempting MongoDB connection...');
-        client = new MongoClient(mongoURI); // No options unless needed
+        const start = Date.now();
+        client = new MongoClient(mongoURI);
         await client.connect();
         db = client.db('english_learning');
-        console.log('MongoDB connected');
+        console.log(`MongoDB connected in ${Date.now() - start}ms`);
     }
     return db;
 }
 
-// Ensure DB Connection with Error Handling
 async function ensureDBConnection() {
-    if (!db) {
-        try {
-            return await connectDB();
-        } catch (err) {
-            console.error('MongoDB connection failed:', err.message);
-            return null; // Let endpoints handle null
-        }
-    }
+    if (!db) await connectDB();
     return db;
 }
 
-// Session Store Setup
 const store = new MongoStore({
     uri: mongoURI,
     databaseName: 'english_learning',
@@ -55,6 +41,10 @@ const store = new MongoStore({
 store.on('connected', () => console.log('MongoStore connected'));
 store.on('error', (err) => console.error('Session store error:', err));
 
+(async () => {
+    await ensureDBConnection();
+})();
+
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
@@ -62,9 +52,9 @@ app.use(session({
     store: store,
     cookie: {
         maxAge: 1000 * 60 * 60 * 24,
-        secure: process.env.NODE_ENV === 'production', // True in prod
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // None for cross-origin in prod
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         path: '/'
     },
     name: 'connect.sid'
@@ -81,14 +71,11 @@ app.use(async (req, res, next) => {
     console.log(`SessionID: ${req.sessionID}, Stored UserID: ${req.session.userId}`);
     const sessionDoc = await dbInstance.collection('sessions').findOne({ _id: req.sessionID });
     console.log('Session from DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-
-    // Fixed CORS for stable domain
     res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
         ? 'https://english-learning-website-olive.vercel.app' 
         : 'http://localhost:3000');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-
     console.log(`Middleware took ${Date.now() - start}ms`);
     next();
 });
@@ -175,7 +162,8 @@ app.post('/api/login', async (req, res) => {
         console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
         console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-        res.json({ message: 'Login successful', userId: req.session.userId });
+        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
+        res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
         console.log(`Login took ${Date.now() - start}ms`);
     } catch (err) {
         console.error('Login error:', err.message);
@@ -378,9 +366,14 @@ app.post('/api/reset-password-submit', async (req, res) => {
 });
 
 // User Data and Progress
-app.get('/api/user-check', (req, res) => {
+app.get('/api/user-check', async (req, res) => {
     console.log('User check:', { sessionId: req.sessionID, userId: req.session.userId });
-    res.json({ loggedIn: !!req.session.userId, name: req.session.userId ? 'User' : null });
+    if (!req.session.userId) {
+        return res.json({ loggedIn: false, name: null });
+    }
+    const db = await ensureDBConnection();
+    const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
+    res.json({ loggedIn: true, name: user ? user.name : 'User' });
 });
 
 app.get('/api/user-progress', requireLogin, async (req, res) => {
