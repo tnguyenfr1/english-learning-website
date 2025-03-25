@@ -70,6 +70,11 @@ const store = new MongoStore({
 store.on('connected', () => console.log('MongoStore connected'));
 store.on('error', (err) => console.error('Session store error:', err));
 
+// Ensure DB is ready before session middleware
+app.use(async (req, res, next) => {
+    await ensureDBConnection();
+    next();
+});
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
@@ -81,7 +86,7 @@ app.use(session({
         httpOnly: true,
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for Vercel
         path: '/', // Ensure it applies to all paths
-        domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined // Broad domain for Vercel
+        
     }
 }));
 
@@ -147,41 +152,30 @@ async function updateUserScore(userId, db) {
 
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
-    console.log('Login attempt:', { email });
+    console.log('Login attempt:', email);
     try {
         const db = await ensureDBConnection();
         if (!db) return res.status(503).json({ error: 'Database unavailable' });
-        const users = db.collection('users');
-        const user = await users.findOne({ email });
-        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (!passwordMatch) return res.status(401).json({ error: 'Invalid credentials' });
-        if (!user.isVerified) return res.status(403).json({ error: 'Please verify your email first' });
-
+        const user = await db.collection('users').findOne({ email });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
         req.session.userId = user._id.toString();
-    console.log('Session set - ID:', req.sessionID, 'UserID:', req.session.userId);
-
-    await new Promise((resolve, reject) => {
-        req.session.save((err) => {
-            if (err) {
-                console.error('Session save failed:', err.message);
-                reject(err);
-            } else {
-                console.log('Session saved successfully');
-                resolve();
-            }
+        console.log('Session set - ID:', req.sessionID, 'UserID:', req.session.userId);
+        await new Promise((resolve, reject) => {
+            req.session.save((err) => {
+                if (err) reject(err);
+                else resolve();
+            });
         });
-    });
-
-    const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-    console.log('Session in DB:', sessionDoc ? 'Found' : 'Not found');
-    res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
-    console.log('Set-Cookie header:', res.getHeader('Set-Cookie'));
-
-    res.status(200).json({ message: 'Login successful', userId: req.session.userId });
+        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+        console.log('Session in DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
+        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
+        console.log('Set-Cookie header:', res.getHeader('Set-Cookie'));
+        res.json({ message: 'Login successful', userId: req.session.userId });
     } catch (err) {
         console.error('Login error:', err.message);
-        res.status(500).json({ error: 'Server error: ' + err.message });
+        res.status(500).json({ error: 'Server error' });
     }
 });
 

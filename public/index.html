@@ -155,12 +155,19 @@
         if (data.loggedIn) {
             authLink.textContent = 'Dashboard';
             authLink.href = '/dashboard.html';
+            authLink.removeEventListener('click', authLink._clickHandler); // Remove old handler
         } else {
             authLink.textContent = 'Log In';
-            authLink.addEventListener('click', (e) => {
+            authLink.href = '#auth'; // Direct href to section
+            authLink.removeEventListener('click', authLink._clickHandler); // Clean up
+            const clickHandler = (e) => {
                 e.preventDefault();
-                document.querySelector('.toc a[href="#auth"]').click();
-            });
+                const authSection = document.querySelector('.toc a[href="#auth"]');
+                authSection.click(); // Trigger TOC navigation
+                document.getElementById('auth').scrollIntoView({ behavior: 'smooth' });
+            };
+            authLink._clickHandler = clickHandler; // Store for cleanup
+            authLink.addEventListener('click', clickHandler);
         }
     } catch (err) {
         console.error('User check error:', err);
