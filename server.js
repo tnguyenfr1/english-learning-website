@@ -55,36 +55,41 @@ const store = new MongoStore({
 store.on('connected', () => console.log('MongoStore connected'));
 store.on('error', (err) => console.error('Session store error:', err));
 
-// Middleware: Session and DB Check
 app.use(session({
-    secret: process.env.SESSION_SECRET ,
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: store,
     cookie: {
-        maxAge: 1000 * 60 * 60 * 24, // 1 day
-        secure: process.env.NODE_ENV === 'production', // Simplified logic
+        maxAge: 1000 * 60 * 60 * 24,
+        secure: process.env.NODE_ENV === 'production', // True in prod
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // None for cross-origin in prod
         path: '/'
     },
     name: 'connect.sid'
 }));
 
 app.use(async (req, res, next) => {
+    const start = Date.now();
     const dbInstance = await ensureDBConnection();
     if (!dbInstance) {
         console.error('DB unavailable in middleware');
         return res.status(503).json({ error: 'Database unavailable' });
     }
-    console.log(`Raw cookies: ${JSON.stringify(req.headers.cookie)}`);
+    console.log(`Request: ${req.method} ${req.path}, Cookies: ${JSON.stringify(req.headers.cookie)}`);
     console.log(`SessionID: ${req.sessionID}, Stored UserID: ${req.session.userId}`);
     const sessionDoc = await dbInstance.collection('sessions').findOne({ _id: req.sessionID });
     console.log('Session from DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-    if (process.env.NODE_ENV === 'production') {
-        res.setHeader('Access-Control-Allow-Origin', 'https://english-learning-website-qdwqpnek4-thuans-projects-b33864b3.vercel.app');
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
+
+    // Fixed CORS for stable domain
+    res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
+        ? 'https://english-learning-website-olive.vercel.app' 
+        : 'http://localhost:3000');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+    console.log(`Middleware took ${Date.now() - start}ms`);
     next();
 });
 
@@ -157,6 +162,7 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Login attempt:', email);
     try {
+        const start = Date.now();
         const db = await ensureDBConnection();
         if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const user = await db.collection('users').findOne({ email });
@@ -168,8 +174,9 @@ app.post('/api/login', async (req, res) => {
         await req.session.save();
         console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session in DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
+        console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
         res.json({ message: 'Login successful', userId: req.session.userId });
+        console.log(`Login took ${Date.now() - start}ms`);
     } catch (err) {
         console.error('Login error:', err.message);
         res.status(500).json({ error: 'Server error' });
