@@ -8,6 +8,7 @@
       { "source": "/api/(.*)", "destination": "/server.js" },
       { "source": "/(.*)", "destination": "/public/$1" }
   ],
-  
-  "env": { "NODE_ENV": "production" }
+  "engines": { "node": "18.x" },
+  "env": { "NODE_ENV": "production" },
+  "alias": "english-learning-website-olive.vercel.app"
 }
