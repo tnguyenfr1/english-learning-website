@@ -82,17 +82,22 @@ app.use(session({
     store: store,
     cookie: {
         maxAge: 1000 * 60 * 60 * 24,
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === 'production' ? true : false,
         httpOnly: true,
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         path: '/'
-    }
+    },
+    name: 'connect.sid' // Explicitly name it
 }));
 
-app.use((req, res, next) => {
-    console.log(`Request: ${req.method} ${req.path}, SessionID: ${req.sessionID}, UserID: ${req.session.userId}, Cookies: ${JSON.stringify(req.headers.cookie)}`);
+app.use(async (req, res, next) => {
+    await ensureDBConnection();
+    console.log(`Raw cookies: ${JSON.stringify(req.headers.cookie)}`);
+    console.log(`SessionID: ${req.sessionID}, Stored UserID: ${req.session.userId}`);
+    const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+    console.log('Session from DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
     if (process.env.NODE_ENV === 'production') {
-        res.setHeader('Access-Control-Allow-Origin', 'https://english-learning-website-offj4mgua-thuans-projects-b33864b3.vercel.app');
+        res.setHeader('Access-Control-Allow-Origin', 'https://english-learning-website-iqbgwftoy-thuans-projects-b33864b3.vercel.app');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
     next();
@@ -154,24 +159,14 @@ app.post('/api/login', async (req, res) => {
     console.log('Login attempt:', email);
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const user = await db.collection('users').findOne({ email });
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         req.session.userId = user._id.toString();
         console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        await new Promise((resolve, reject) => {
-            req.session.save((err) => {
-                if (err) {
-                    console.error('Session save error:', err);
-                    reject(err);
-                } else {
-                    console.log('Session saved - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-                    resolve();
-                }
-            });
-        });
+        await req.session.save();
+        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
         console.log('Session in DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
         res.json({ message: 'Login successful', userId: req.session.userId });
