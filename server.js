@@ -77,9 +77,11 @@ app.use(session({
     store: store,
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1 day
-        secure: process.env.NODE_ENV === 'production', // True in prod (HTTPS)
+        secure: process.env.NODE_ENV === 'production', // True in prod
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // 'none' for prod cross-origin
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for Vercel
+        path: '/', // Ensure it applies to all paths
+        domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined // Broad domain for Vercel
     }
 }));
 
@@ -148,24 +150,26 @@ app.post('/api/login', async (req, res) => {
         if (!user.isVerified) return res.status(403).json({ error: 'Please verify your email first' });
 
         req.session.userId = user._id.toString();
-        console.log('Session ID:', req.sessionID, 'User ID:', req.session.userId);
+    console.log('Session set - ID:', req.sessionID, 'UserID:', req.session.userId);
 
-        await new Promise((resolve, reject) => {
-            req.session.save((err) => {
-                if (err) {
-                    console.error('Session save failed:', err.message);
-                    reject(err);
-                } else {
-                    console.log('Session saved');
-                    resolve();
-                }
-            });
+    await new Promise((resolve, reject) => {
+        req.session.save((err) => {
+            if (err) {
+                console.error('Session save failed:', err.message);
+                reject(err);
+            } else {
+                console.log('Session saved successfully');
+                resolve();
+            }
         });
+    });
 
-        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session in DB:', sessionDoc ? 'Found' : 'Not found');
+    const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+    console.log('Session in DB:', sessionDoc ? 'Found' : 'Not found');
+    res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
+    console.log('Set-Cookie header:', res.getHeader('Set-Cookie'));
 
-        res.status(200).json({ message: 'Login successful', userId: req.session.userId });
+    res.status(200).json({ message: 'Login successful', userId: req.session.userId });
     } catch (err) {
         console.error('Login error:', err.message);
         res.status(500).json({ error: 'Server error: ' + err.message });

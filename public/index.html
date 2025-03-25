@@ -145,77 +145,65 @@
         let isLogin = true;
 
         async function checkUserStatus() {
-            try {
-                const res = await fetch('/api/user-check', {
-                    credentials: 'include' // Ensure cookies are sent
-                });
-                const data = await res.json();
-                console.log('Initial user check:', data);
-                const authLink = document.getElementById('authLink');
-                if (data.loggedIn) {
-                    authLink.textContent = 'Dashboard';
-                    authLink.href = '/dashboard.html';
-                } else {
-                    authLink.textContent = 'Log In';
-                    authLink.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        document.querySelector('.toc a[href="#auth"]').click();
-                    });
-                }
-            } catch (err) {
-                console.error('User check error:', err);
-                document.getElementById('auth-error').textContent = 'Failed to check login status';
-            }
-        }
-
-        checkUserStatus();
-
-        function toggleAuth() {
-            isLogin = !isLogin;
-            document.getElementById('auth-title').textContent = isLogin ? 'Log In' : 'Sign Up';
-            document.getElementById('toggle-auth').textContent = isLogin ? 'Need to sign up? Click here.' : 'Already have an account? Log in.';
-            document.getElementById('auth-error').textContent = '';
-            document.getElementById('authForm').reset();
-        }
-
-        document.getElementById('toggle-auth').addEventListener('click', toggleAuth);
-
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            const endpoint = isLogin ? '/api/login' : '/api/signup';
-            const body = isLogin ? { email, password } : { email, password, name: email.split('@')[0] };
-
-            try {
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include', // Ensure cookies are sent
-                    body: JSON.stringify(body)
-                });
-                console.log('Auth response status:', res.status);
-                const data = await res.json();
-                console.log('Auth response data:', data);
-
-                if (!res.ok) {
-                    throw new Error(data.error || `Request failed with status ${res.status}`);
-                }
-
-                if (isLogin) {
-                    console.log('Login successful, redirecting to dashboard with userId:', data.userId);
-                    document.getElementById('authLink').textContent = 'Dashboard';
-                    document.getElementById('authLink').href = '/dashboard.html';
-                    window.location.href = '/dashboard.html'; // Immediate redirect
-                } else {
-                    alert('Signup successful! Please check your email to verify your account.');
-                    toggleAuth();
-                }
-            } catch (err) {
-                console.error('Auth error:', err.message);
-                document.getElementById('auth-error').textContent = err.message;
-            }
+    try {
+        const res = await fetch('/api/user-check', {
+            credentials: 'include'
         });
+        const data = await res.json();
+        console.log('User check response:', data, 'Cookies:', document.cookie, 'Headers:', res.headers.get('Set-Cookie'));
+        const authLink = document.getElementById('authLink');
+        if (data.loggedIn) {
+            authLink.textContent = 'Dashboard';
+            authLink.href = '/dashboard.html';
+        } else {
+            authLink.textContent = 'Log In';
+            authLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelector('.toc a[href="#auth"]').click();
+            });
+        }
+    } catch (err) {
+        console.error('User check error:', err);
+        document.getElementById('auth-error').textContent = 'Failed to check login status';
+    }
+}
+
+document.getElementById('authForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const endpoint = isLogin ? '/api/login' : '/api/signup';
+    const body = isLogin ? { email, password } : { email, password, name: email.split('@')[0] };
+
+    try {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body)
+        });
+        console.log('Login response:', res.status, 'Cookies:', document.cookie, 'Headers:', res.headers.get('Set-Cookie'));
+        const data = await res.json();
+        console.log('Login data:', data);
+
+        if (!res.ok) {
+            throw new Error(data.error || `Request failed with status ${res.status}`);
+        }
+
+        if (isLogin) {
+            console.log('Login successful, redirecting to dashboard with userId:', data.userId);
+            document.getElementById('authLink').textContent = 'Dashboard';
+            document.getElementById('authLink').href = '/dashboard.html';
+            window.location.href = '/dashboard.html';
+        } else {
+            alert('Signup successful! Please check your email to verify your account.');
+            toggleAuth();
+        }
+    } catch (err) {
+        console.error('Auth error:', err.message);
+        document.getElementById('auth-error').textContent = err.message;
+    }
+});
 
         // Navigation
         document.querySelectorAll('.toc a').forEach(link => {

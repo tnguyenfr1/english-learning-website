@@ -8,5 +8,18 @@
       { "src": "/api/(.*)", "dest": "/server.js" },
       { "src": "/(.*)", "dest": "/public/$1" }
   ],
-  "env": { "NODE_ENV": "production" }
+  "headers": [
+      {
+          "source": "/api/(.*)",
+          "headers": [
+              { "key": "Access-Control-Allow-Origin", "value": "https://english-learning-website-j6dbg6cqe-thuans-projects-b33864b3.vercel.app" },
+              { "key": "Access-Control-Allow-Credentials", "value": "true" },
+              { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" }
+          ]
+      }
+  ],
+  "env": {
+      "NODE_ENV": "production",
+      "BASE_URL": "https://english-learning-website-j6dbg6cqe-thuans-projects-b33864b3.vercel.app"
+  }
 }
