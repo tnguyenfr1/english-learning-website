@@ -18,9 +18,7 @@
           ]
       }
   ],
-  "engines": {
-      "node": "18.x" 
-  },
+ 
   "env": {
       "NODE_ENV": "production"
   }
