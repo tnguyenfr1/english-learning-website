@@ -4,6 +4,10 @@
       { "src": "server.js", "use": "@vercel/node" },
       { "src": "public/**", "use": "@vercel/static" }
   ],
+  "rewrites": [
+      { "source": "/api/(.*)", "destination": "/server.js" },
+      { "source": "/(.*)", "destination": "/public/$1" }
+  ],
   "headers": [
       {
           "source": "/api/(.*)",

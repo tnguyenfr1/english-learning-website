@@ -85,6 +85,15 @@ app.use(session({
     }
 }));
 
+app.use((req, res, next) => {
+    console.log(`Request: ${req.method} ${req.path}, SessionID: ${req.sessionID}, UserID: ${req.session.userId}, Cookies: ${JSON.stringify(req.headers.cookie)}`);
+    if (process.env.NODE_ENV === 'production') {
+        res.setHeader('Access-Control-Allow-Origin', 'https://english-learning-website-j6dbg6cqe-thuans-projects-b33864b3.vercel.app');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    next();
+});
+
 const requireLogin = (req, res, next) => {
     if (!req.session.userId) {
         console.log('No session userId - access denied');
