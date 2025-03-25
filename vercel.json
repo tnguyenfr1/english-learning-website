@@ -12,14 +12,16 @@
       {
           "source": "/api/(.*)",
           "headers": [
-              { "key": "Access-Control-Allow-Origin", "value": "https://english-learning-website-iqbgwftoy-thuans-projects-b33864b3.vercel.app" },
+              { "key": "Access-Control-Allow-Origin", "value": "https://english-learning-website-qdwqpnek4-thuans-projects-b33864b3.vercel.app" },
               { "key": "Access-Control-Allow-Credentials", "value": "true" },
               { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" }
           ]
       }
   ],
+  "engines": {
+      "node": "18.x" 
+  },
   "env": {
-      "NODE_ENV": "production",
-      "BASE_URL": "https://english-learning-website-iqbgwftoy-thuans-projects-b33864b3.vercel.app"
+      "NODE_ENV": "production"
   }
 }
