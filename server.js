@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const MongoStore = require('connect-mongodb-session')(session);
 const { MongoClient, ObjectId } = require('mongodb');
+const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
 require('dotenv').config();
 
