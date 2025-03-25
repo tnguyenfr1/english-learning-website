@@ -145,72 +145,69 @@
         let isLogin = true;
 
         async function checkUserStatus() {
-    try {
-        const res = await fetch('/api/user-check', {
-            credentials: 'include'
-        });
-        const data = await res.json();
-        console.log('User check response:', data, 'Cookies:', document.cookie, 'Headers:', res.headers.get('Set-Cookie'));
-        const authLink = document.getElementById('authLink');
-        if (data.loggedIn) {
-            authLink.textContent = 'Dashboard';
-            authLink.href = '/dashboard.html';
-            authLink.removeEventListener('click', authLink._clickHandler); // Remove old handler
-        } else {
-            authLink.textContent = 'Log In';
-            authLink.href = '#auth'; // Direct href to section
-            authLink.removeEventListener('click', authLink._clickHandler); // Clean up
-            const clickHandler = (e) => {
-                e.preventDefault();
-                const authSection = document.querySelector('.toc a[href="#auth"]');
-                authSection.click(); // Trigger TOC navigation
-                document.getElementById('auth').scrollIntoView({ behavior: 'smooth' });
-            };
-            authLink._clickHandler = clickHandler; // Store for cleanup
-            authLink.addEventListener('click', clickHandler);
+        try {
+            const res = await fetch('/api/user-check', {
+                credentials: 'include'
+            });
+            const data = await res.json();
+            console.log('User check response:', data, 'Cookies:', document.cookie);
+            const authLink = document.getElementById('authLink');
+            if (data.loggedIn) {
+                authLink.textContent = 'Dashboard';
+                authLink.href = '/dashboard.html';
+            } else {
+                authLink.textContent = 'Log In';
+                authLink.href = '#auth';
+                authLink.onclick = (e) => {
+                    e.preventDefault();
+                    console.log('Log In clicked');
+                    document.getElementById('auth').scrollIntoView({ behavior: 'smooth' });
+                };
+            }
+        } catch (err) {
+            console.error('User check error:', err);
+            document.getElementById('auth-error').textContent = 'Failed to check login status';
         }
-    } catch (err) {
-        console.error('User check error:', err);
-        document.getElementById('auth-error').textContent = 'Failed to check login status';
     }
-}
 
-document.getElementById('authForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    const endpoint = isLogin ? '/api/login' : '/api/signup';
-    const body = isLogin ? { email, password } : { email, password, name: email.split('@')[0] };
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const endpoint = isLogin ? '/api/login' : '/api/signup';
+        const body = isLogin ? { email, password } : { email, password, name: email.split('@')[0] };
 
-    try {
-        const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(body)
-        });
-        console.log('Login response:', res.status, 'Cookies:', document.cookie, 'Headers:', res.headers.get('Set-Cookie'));
-        const data = await res.json();
-        console.log('Login data:', data);
-
-        if (!res.ok) {
-            throw new Error(data.error || `Request failed with status ${res.status}`);
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(body)
+            });
+            console.log('Auth response:', res.status, 'Cookies:', document.cookie);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Auth failed');
+            if (isLogin) {
+                window.location.href = '/dashboard.html';
+            } else {
+                alert('Signup successful! Please check your email.');
+                toggleAuth();
+            }
+        } catch (err) {
+            console.error('Auth error:', err.message);
+            document.getElementById('auth-error').textContent = err.message;
         }
+    });
 
-        if (isLogin) {
-            console.log('Login successful, redirecting to dashboard with userId:', data.userId);
-            document.getElementById('authLink').textContent = 'Dashboard';
-            document.getElementById('authLink').href = '/dashboard.html';
-            window.location.href = '/dashboard.html';
-        } else {
-            alert('Signup successful! Please check your email to verify your account.');
-            toggleAuth();
-        }
-    } catch (err) {
-        console.error('Auth error:', err.message);
-        document.getElementById('auth-error').textContent = err.message;
+    function toggleAuth() {
+        isLogin = !isLogin;
+        document.getElementById('authTitle').textContent = isLogin ? 'Log In' : 'Sign Up';
+        document.getElementById('authSubmit').textContent = isLogin ? 'Log In' : 'Sign Up';
+        document.getElementById('toggleAuth').textContent = isLogin ? 'Need an account? Sign Up' : 'Have an account? Log In';
     }
-});
+
+    document.getElementById('toggleAuth').addEventListener('click', toggleAuth);
+    window.addEventListener('load', checkUserStatus);
 
         // Navigation
         document.querySelectorAll('.toc a').forEach(link => {

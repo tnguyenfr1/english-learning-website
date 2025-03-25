@@ -81,19 +81,18 @@ app.use(session({
     saveUninitialized: false,
     store: store,
     cookie: {
-        maxAge: 1000 * 60 * 60 * 24, // 1 day
-        secure: process.env.NODE_ENV === 'production', // True in prod
+        maxAge: 1000 * 60 * 60 * 24,
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for Vercel
-        path: '/', // Ensure it applies to all paths
-        
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/'
     }
 }));
 
 app.use((req, res, next) => {
     console.log(`Request: ${req.method} ${req.path}, SessionID: ${req.sessionID}, UserID: ${req.session.userId}, Cookies: ${JSON.stringify(req.headers.cookie)}`);
     if (process.env.NODE_ENV === 'production') {
-        res.setHeader('Access-Control-Allow-Origin', 'https://english-learning-website-j6dbg6cqe-thuans-projects-b33864b3.vercel.app');
+        res.setHeader('Access-Control-Allow-Origin', 'https://english-learning-website-offj4mgua-thuans-projects-b33864b3.vercel.app');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
     next();
@@ -161,17 +160,20 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         req.session.userId = user._id.toString();
-        console.log('Session set - ID:', req.sessionID, 'UserID:', req.session.userId);
+        console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         await new Promise((resolve, reject) => {
             req.session.save((err) => {
-                if (err) reject(err);
-                else resolve();
+                if (err) {
+                    console.error('Session save error:', err);
+                    reject(err);
+                } else {
+                    console.log('Session saved - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+                    resolve();
+                }
             });
         });
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
         console.log('Session in DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
-        console.log('Set-Cookie header:', res.getHeader('Set-Cookie'));
         res.json({ message: 'Login successful', userId: req.session.userId });
     } catch (err) {
         console.error('Login error:', err.message);
