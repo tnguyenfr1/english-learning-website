@@ -2,8 +2,8 @@ const express = require('express');
 const session = require('express-session');
 const MongoStore = require('connect-mongodb-session')(session);
 const { MongoClient, ObjectId } = require('mongodb');
-const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
+const nodemailer = require('nodemailer'); // Added
 require('dotenv').config();
 
 const app = express();
@@ -81,17 +81,77 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Email Transporter
+// Nodemailer setup (example for signup)
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     }
 });
 
+app.post('/api/signup', async (req, res) => {
+    const { name, email, password } = req.body;
+    try {
+        const db = await ensureDBConnection();
+        const existingUser = await db.collection('users').findOne({ email });
+        if (existingUser) return res.status(400).json({ error: 'Email already exists' });
+        
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = { name, email, password: hashedPassword };
+        const result = await db.collection('users').insertOne(user);
+        
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Welcome to English Learning!',
+            text: `Hi ${name}, welcome to English Learning! Your account is ready.`
+        };
+        await transporter.sendMail(mailOptions);
+        console.log(`Verification email sent to: ${email}`);
+        
+        res.status(201).json({ message: 'User created', userId: result.insertedId });
+    } catch (err) {
+        console.error('Signup error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    console.log('Login attempt:', email);
+    try {
+        const start = Date.now();
+        const db = await ensureDBConnection();
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
+        const user = await db.collection('users').findOne({ email });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        req.session.userId = user._id.toString();
+        console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+        await req.session.save();
+        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+        console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
+        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
+        res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
+        console.log(`Login took ${Date.now() - start}ms`);
+    } catch (err) {
+        console.error('Login error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/user-check', async (req, res) => {
+    console.log('User check:', { sessionId: req.sessionID, userId: req.session.userId });
+    if (!req.session.userId) {
+        return res.json({ loggedIn: false, name: null });
+    }
+    const db = await ensureDBConnection();
+    const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
+    res.json({ loggedIn: true, name: user ? user.name : 'User' });
+});
 // Authentication Middleware
 const requireLogin = (req, res, next) => {
     if (!req.session.userId) {
@@ -366,16 +426,7 @@ app.post('/api/reset-password-submit', async (req, res) => {
     }
 });
 
-// User Data and Progress
-app.get('/api/user-check', async (req, res) => {
-    console.log('User check:', { sessionId: req.sessionID, userId: req.session.userId });
-    if (!req.session.userId) {
-        return res.json({ loggedIn: false, name: null });
-    }
-    const db = await ensureDBConnection();
-    const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
-    res.json({ loggedIn: true, name: user ? user.name : 'User' });
-});
+
 
 app.get('/api/user-progress', requireLogin, async (req, res) => {
     try {
