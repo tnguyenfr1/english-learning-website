@@ -228,17 +228,12 @@ app.post('/api/login', async (req, res) => {
         }
         req.session.userId = user._id.toString();
         console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        try {
-            await new Promise((resolve, reject) => {
-                req.session.save((err) => {
-                    if (err) reject(err);
-                    else resolve();
-                });
+        await new Promise((resolve, reject) => {
+            req.session.save((err) => {
+                if (err) reject(err);
+                else resolve();
             });
-        } catch (err) {
-            console.error('Session save failed:', err.message);
-            return res.status(500).json({ error: 'Session error' });
-        }
+        });
         console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
         console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
