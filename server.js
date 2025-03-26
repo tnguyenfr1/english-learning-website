@@ -77,7 +77,8 @@ mongoStore.on('connected', () => console.log('MongoStore connected'));
 mongoStore.on('error', (err) => console.error('MongoStore error (continuing):', err.message));
 
 // Force MemoryStore fallback if MongoStore fails
-let sessionStore;
+let sessionStore = new session.MemoryStore(); // Ensure a default fallback
+
 (async () => {
     try {
         await Promise.race([
@@ -85,9 +86,9 @@ let sessionStore;
             new Promise((_, reject) => setTimeout(() => reject(new Error('MongoStore init timeout')), 10000))
         ]);
         console.log('MongoStore initialized successfully');
+        sessionStore = mongoStore; // Assign only if successful
     } catch (err) {
         console.error('MongoStore init failed, using MemoryStore:', err.message);
-        sessionStore = new session.MemoryStore();
     }
 })();
 
@@ -118,15 +119,11 @@ app.use(async (req, res, next) => {
         typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
     );
     
-    res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : 'https://english-learning-website-olive.vercel.app');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') {
-        console.log('Handling OPTIONS for origin:', origin);
-        return res.status(200).end();
-    }
-    console.log(`Request from origin: ${origin}, Allowed: ${isAllowed}`);
+    res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight responses for 24 hours
     next();
 });
 
@@ -238,7 +235,13 @@ app.post('/api/login', async (req, res) => {
         }
         req.session.userId = user._id.toString();
         console.log('Setting session - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        await req.session.save();
+        req.session.save((err) => {
+            if (err) {
+                console.error('Session save error:', err.message);
+            } else {
+                console.log('Session saved successfully');
+            }
+        });
         console.log('Session saved - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const cookieString = `connect.sid=${req.sessionID}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=86400`;
         res.setHeader('Set-Cookie', cookieString);
