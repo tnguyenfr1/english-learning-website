@@ -233,20 +233,21 @@ app.post('/api/login', async (req, res) => {
         }
         req.session.userId = user._id.toString();
         console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        await new Promise((resolve, reject) => {
-            req.session.save((err) => {
-                if (err) {
-                    console.error('Session save failed:', err.message);
-                    reject(err);
-                } else {
-                    console.log('Session saved successfully');
-                    resolve();
-                }
-            });
-        });
+        await req.session.save();
+        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session in DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-        const cookieString = `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}; Max-Age=86400`;
+        if (!sessionDoc) {
+            console.error('Session not found in DB after save');
+            await db.collection('sessions').insertOne({
+                _id: req.sessionID,
+                expires: new Date(Date.now() + 1000 * 60 * 60 * 24),
+                session: { userId: req.session.userId }
+            });
+            console.log('Manually inserted session');
+        } else {
+            console.log('Session in DB:', JSON.stringify(sessionDoc));
+        }
+        const cookieString = `connect.sid=${req.sessionID}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=86400`;
         res.setHeader('Set-Cookie', cookieString);
         console.log('Set-Cookie header:', cookieString);
         res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
