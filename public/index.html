@@ -185,7 +185,7 @@
     const password = document.getElementById('password').value;
     console.log('Submitting login:', email);
     try {
-        const apiBase = window.location.origin; // Use current domain
+        const apiBase = window.location.origin;
         const res = await fetch(`${apiBase}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

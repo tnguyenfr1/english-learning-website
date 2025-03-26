@@ -246,7 +246,9 @@ app.post('/api/login', async (req, res) => {
         });
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
         console.log('Session in DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
+        const cookieString = `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}; Max-Age=86400`;
+        res.setHeader('Set-Cookie', cookieString);
+        console.log('Set-Cookie header:', cookieString);
         res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
         console.log(`Login took ${Date.now() - start}ms`);
     } catch (err) {
