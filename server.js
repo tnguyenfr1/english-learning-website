@@ -15,39 +15,52 @@ console.log('Server starting...');
 const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster';
 let client;
 let db;
-
 async function connectDB() {
     if (!client) {
-        console.log('Attempting MongoDB connection...');
+        console.log('Attempting MongoDB connection with URI:', mongoURI.replace(/:([^:@]+)@/, ':****@')); // Mask password
         const start = Date.now();
-        client = new MongoClient(mongoURI);
-        await client.connect();
-        db = client.db('english_learning');
-        console.log(`MongoDB connected in ${Date.now() - start}ms`);
+        try {
+            client = new MongoClient(mongoURI, { serverSelectionTimeoutMS: 10000 }); // Reduce timeout
+            await client.connect();
+            db = client.db('english_learning');
+            console.log(`MongoDB connected in ${Date.now() - start}ms`);
+        } catch (err) {
+            console.error('MongoDB connection failed:', err.message);
+            throw err;
+        }
     }
     return db;
 }
 
 async function ensureDBConnection() {
-    if (!db) await connectDB();
+    if (!db) {
+        try {
+            return await connectDB();
+        } catch (err) {
+            console.error('DB connection retry failed:', err.message);
+            return null;
+        }
+    }
     return db;
 }
 
 const store = new MongoStore({
     uri: mongoURI,
     databaseName: 'english_learning',
-    collection: 'sessions'
+    collection: 'sessions',
+    autoRemove: 'native'
 });
 
 store.on('connected', () => console.log('MongoStore connected'));
-store.on('error', (err) => console.error('Session store error:', err));
+store.on('error', (err) => console.error('MongoStore error (continuing without session store):', err.message));
 
 (async () => {
-    await ensureDBConnection();
+    const dbInstance = await ensureDBConnection();
+    if (!dbInstance) console.error('Initial DB connection failed - running without DB');
 })();
 
 app.use(session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || 'fallback-secret',
     resave: false,
     saveUninitialized: false,
     store: store,
@@ -65,13 +78,17 @@ app.use(async (req, res, next) => {
     const start = Date.now();
     const dbInstance = await ensureDBConnection();
     if (!dbInstance) {
-        console.error('DB unavailable in middleware');
+        console.error(`DB unavailable for ${req.method} ${req.path}`);
         return res.status(503).json({ error: 'Database unavailable' });
     }
     console.log(`Request: ${req.method} ${req.path}, Cookies: ${JSON.stringify(req.headers.cookie)}`);
     console.log(`SessionID: ${req.sessionID}, Stored UserID: ${req.session.userId}`);
-    const sessionDoc = await dbInstance.collection('sessions').findOne({ _id: req.sessionID });
-    console.log('Session from DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
+    try {
+        const sessionDoc = await dbInstance.collection('sessions').findOne({ _id: req.sessionID });
+        console.log('Session from DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
+    } catch (err) {
+        console.error('Session fetch error:', err.message);
+    }
     res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
         ? 'https://english-learning-website-olive.vercel.app' 
         : 'http://localhost:3000');
@@ -80,13 +97,43 @@ app.use(async (req, res, next) => {
     console.log(`Middleware took ${Date.now() - start}ms`);
     next();
 });
-
 // Nodemailer setup (example for signup)
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
+    }
+});
+
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    console.log('Login attempt:', email);
+    try {
+        const start = Date.now();
+        const db = await ensureDBConnection();
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
+        const user = await db.collection('users').findOne({ email });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        req.session.userId = user._id.toString();
+        console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+        await new Promise((resolve, reject) => {
+            req.session.save((err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+        console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
+        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
+        res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
+        console.log(`Login took ${Date.now() - start}ms`);
+    } catch (err) {
+        console.error('Login error:', err.message);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
@@ -117,31 +164,7 @@ app.post('/api/signup', async (req, res) => {
     }
 });
 
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    console.log('Login attempt:', email);
-    try {
-        const start = Date.now();
-        const db = await ensureDBConnection();
-        if (!db) return res.status(503).json({ error: 'Database unavailable' });
-        const user = await db.collection('users').findOne({ email });
-        if (!user || !(await bcrypt.compare(password, user.password))) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-        req.session.userId = user._id.toString();
-        console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        await req.session.save();
-        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
-        res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
-        console.log(`Login took ${Date.now() - start}ms`);
-    } catch (err) {
-        console.error('Login error:', err.message);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
+
 
 app.get('/api/user-check', async (req, res) => {
     console.log('User check:', { sessionId: req.sessionID, userId: req.session.userId });
@@ -149,9 +172,11 @@ app.get('/api/user-check', async (req, res) => {
         return res.json({ loggedIn: false, name: null });
     }
     const db = await ensureDBConnection();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
     const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
     res.json({ loggedIn: true, name: user ? user.name : 'User' });
 });
+
 // Authentication Middleware
 const requireLogin = (req, res, next) => {
     if (!req.session.userId) {
@@ -205,94 +230,7 @@ async function updateUserScore(userId, db) {
     console.log('Updated titles for user scores');
 }
 
-// Authentication Routes
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    console.log('Login attempt:', email);
-    try {
-        const start = Date.now();
-        const db = await ensureDBConnection();
-        if (!db) return res.status(503).json({ error: 'Database unavailable' });
-        const user = await db.collection('users').findOne({ email });
-        if (!user || !(await bcrypt.compare(password, user.password))) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-        req.session.userId = user._id.toString();
-        console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        await req.session.save();
-        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
-        res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
-        console.log(`Login took ${Date.now() - start}ms`);
-    } catch (err) {
-        console.error('Login error:', err.message);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
 
-app.post('/api/signup', async (req, res) => {
-    const { email, password, name } = req.body;
-    console.log('Signup attempt:', { email });
-    try {
-        const db = await ensureDBConnection();
-        if (!db) return res.status(503).json({ error: 'Database unavailable' });
-        const users = db.collection('users');
-        const existingUser = await users.findOne({ email });
-        if (existingUser) {
-            console.log('Email already in use:', email);
-            return res.status(400).json({ error: 'Email already in use' });
-        }
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-        const result = await users.insertOne({
-            email,
-            password: hashedPassword,
-            name,
-            score: 0,
-            homeworkScores: [],
-            pronunciationScores: [],
-            comprehensionScores: [],
-            quizScores: [],
-            writingScores: [],
-            referencesVisited: [],
-            achievements: [],
-            admin: false,
-            verificationToken,
-            isVerified: false
-        });
-        console.log('Signup successful:', email, 'User ID:', result.insertedId);
-
-        const confirmationUrl = `${process.env.BASE_URL || 'https://english-learning-website-qdwqpnek4-thuans-projects-b33864b3.vercel.app'}/api/verify?token=${verificationToken}`;
-        const mailOptions = {
-            from: 'no-reply@englishlearning.com',
-            to: email,
-            subject: 'Welcome to Thuan’s English Learning! Confirm Your Email',
-            html: `
-                <div style="font-family: 'SF Pro Display', -apple-system, sans-serif; background: #1d1d1e; color: #fff; padding: 40px; max-width: 600px; margin: 0 auto; border-radius: 18px;">
-                    <h2 style="font-size: 28px; font-weight: 700; color: #fff; text-align: center;">Hello ${name || 'Learner'}!</h2>
-                    <p style="font-size: 18px; line-height: 1.5; color: #d1d1d1; text-align: center;">
-                        Welcome to Thuan’s English Learning Platform! We’re excited to help you master English.
-                    </p>
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="${confirmationUrl}" style="background: #0071e3; color: #fff; padding: 12px 24px; text-decoration: none; font-size: 17px; font-weight: 700; border-radius: 10px; display: inline-block;">Verify Your Email</a>
-                    </div>
-                    <p style="font-size: 14px; color: #d1d1d1; text-align: center;">
-                        Keep this email—visit us anytime at <a href="${process.env.BASE_URL || 'https://english-learning-website-qdwqpnek4-thuans-projects-b33864b3.vercel.app'}" style="color: #2997ff;">our site</a>!
-                    </p>
-                    <p style="font-size: 14px; color: #d1d1d1; text-align: center;">Cheers,<br>Thuan & Team</p>
-                </div>
-            `
-        };
-        await transporter.sendMail(mailOptions);
-        console.log('Verification email sent to:', email);
-        res.status(201).json({ message: 'Signup successful! Check your email to verify.' });
-    } catch (err) {
-        console.error('Signup error:', err.message);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
 
 app.get('/api/verify', async (req, res) => {
     const { token } = req.query;
