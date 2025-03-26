@@ -185,9 +185,7 @@
     const password = document.getElementById('password').value;
     console.log('Submitting login:', email);
     try {
-        const apiBase = window.location.hostname === 'localhost' 
-            ? 'http://localhost:3000' 
-            : 'https://english-learning-website-olive.vercel.app';
+        const apiBase = window.location.origin; // Use current domain
         const res = await fetch(`${apiBase}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

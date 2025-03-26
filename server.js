@@ -95,32 +95,25 @@ app.use(session({
 
 // Middleware
 app.use(async (req, res, next) => {
-    const start = Date.now();
-    res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
-        ? 'https://english-learning-website-olive.vercel.app' 
-        : 'http://localhost:3000');
+    const origin = req.headers.origin || 'https://english-learning-website-olive.vercel.app';
+    const allowedOrigins = [
+        'http://localhost:3000',
+        'https://english-learning-website-olive.vercel.app',
+        /\.vercel\.app$/, // Regex for Vercel preview domains
+    ];
+    const isAllowed = allowedOrigins.some(allowed => 
+        typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
+    );
+    
+    res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : 'https://english-learning-website-olive.vercel.app');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
     if (req.method === 'OPTIONS') {
+        console.log('Handling OPTIONS for origin:', origin);
         return res.status(200).end();
     }
-
-    const dbInstance = await ensureDBConnection();
-    if (!dbInstance) {
-        console.error(`DB unavailable for ${req.method} ${req.path}`);
-        return res.status(503).json({ error: 'Database unavailable' });
-    }
-    console.log(`Request: ${req.method} ${req.path}, Cookies: ${JSON.stringify(req.headers.cookie)}`);
-    console.log(`SessionID: ${req.sessionID}, Stored UserID: ${req.session.userId}`);
-    try {
-        const sessionDoc = await dbInstance.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session from DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-    } catch (err) {
-        console.error('Session fetch error:', err.message);
-    }
-    console.log(`Middleware took ${Date.now() - start}ms`);
+    console.log(`Request from origin: ${origin}, Allowed: ${isAllowed}`);
     next();
 });
 
