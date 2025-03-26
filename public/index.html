@@ -141,6 +141,41 @@
     <button id="backToTop" style="display: none;">↑</button>
 
     <script>
+
+
+async function loadLeaderboard() {
+    try {
+        const res = await fetch('/api/leaderboard');
+        const leaderboard = await res.json();
+        const leaderboardBody = document.getElementById('leaderboardBody');
+        leaderboardBody.innerHTML = leaderboard.map((user, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${user.name}</td>
+                <td>${user.score}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Error loading leaderboard:', err);
+    }
+}
+
+window.addEventListener('load', loadLeaderboard);
+
+const backToTopButton = document.getElementById('backToTop');
+window.addEventListener('scroll', () => {
+    if (window.scrollY > 300) {
+        backToTopButton.style.display = 'block';
+    } else {
+        backToTopButton.style.display = 'none';
+    }
+});
+
+backToTopButton.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+
         // Authentication Handling
         let isLogin = true;
 
@@ -157,13 +192,21 @@
         async function checkUserStatus() {
             try {
                 const res = await fetch('/api/user-check', {
-                    credentials: 'include'
-                });
+    credentials: 'include',
+    mode: 'same-origin'
+});
                 const data = await res.json();
                 console.log('User check response:', data, 'Cookies:', document.cookie);
-                if (data.loggedIn) {
-                    authLink.textContent = 'Dashboard';
-                    authLink.href = '/dashboard.html';
+                authLink.textContent = data.loggedIn ? 'Logout' : 'Log In';
+authLink.href = data.loggedIn ? '#' : '#auth';
+            if (data.loggedIn) {
+                authLink.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    await fetch('/api/logout', { method: 'GET', credentials: 'include' });
+                    localStorage.removeItem('userName');
+                    window.location.reload();
+                });
+            
                 } else {
                     authLink.textContent = 'Log In';
                     authLink.href = '#auth';
