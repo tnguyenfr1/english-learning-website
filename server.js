@@ -125,12 +125,17 @@ app.post('/api/login', async (req, res) => {
         }
         req.session.userId = user._id.toString();
         console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        await new Promise((resolve, reject) => {
-            req.session.save((err) => {
-                if (err) reject(err);
-                else resolve();
+        try {
+            await new Promise((resolve, reject) => {
+                req.session.save((err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
             });
-        });
+        } catch (err) {
+            console.error('Session save failed:', err.message);
+            return res.status(500).json({ error: 'Session error' });
+        }
         console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
         console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
@@ -398,14 +403,13 @@ app.get('/api/lessons', async (req, res) => {
     try {
         const db = await ensureDBConnection();
         if (!db) return res.status(503).json({ error: 'Database unavailable' });
-        const lessons = await db.collection('lessons').find({}).toArray();
+        const lessons = await db.collection('lessons').find().toArray();
         res.json(lessons);
     } catch (err) {
-        console.error('Lessons error:', err.message);
+        console.error('Lessons fetch error:', err.message);
         res.status(500).json({ error: 'Server error' });
     }
 });
-
 app.get('/api/references', async (req, res) => {
     try {
         const db = await ensureDBConnection();
@@ -424,26 +428,24 @@ app.get('/api/references', async (req, res) => {
 app.get('/api/blogs', async (req, res) => {
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.json([]);
-        const blogs = await db.collection('blogs').find().sort({ createdAt: -1 }).toArray();
-        console.log('Blogs sent:', blogs.length);
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
+        const blogs = await db.collection('blogs').find().toArray();
         res.json(blogs);
     } catch (err) {
-        console.error('Blogs error:', err.message);
-        res.status(500).json({ error: 'Failed to fetch blogs: ' + err.message });
+        console.error('Blogs fetch error:', err.message);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
 app.get('/api/quizzes', async (req, res) => {
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.json([]);
-        const quizzes = await db.collection('quizzes').find().sort({ createdAt: -1 }).toArray();
-        console.log('Quizzes sent:', quizzes.length);
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
+        const quizzes = await db.collection('quizzes').find().toArray();
         res.json(quizzes);
     } catch (err) {
-        console.error('Quizzes error:', err.message);
-        res.status(500).json({ error: 'Failed to fetch quizzes: ' + err.message });
+        console.error('Quizzes fetch error:', err.message);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
@@ -451,18 +453,13 @@ app.get('/api/leaderboard', async (req, res) => {
     try {
         const db = await ensureDBConnection();
         if (!db) return res.status(503).json({ error: 'Database unavailable' });
-        const users = await db.collection('users')
-            .find({})
-            .sort({ score: -1 })
-            .limit(10)
-            .toArray();
-        res.json(users.map(user => ({ name: user.name, score: user.score || 0 })));
+        const users = await db.collection('users').find().sort({ score: -1 }).limit(10).toArray();
+        res.json(users);
     } catch (err) {
-        console.error('Leaderboard error:', err.message);
-        res.status(500).json({ error: 'Server error: ' + err.message });
+        console.error('Leaderboard fetch error:', err.message);
+        res.status(500).json({ error: 'Server error' });
     }
 });
-
 // Activity Submission Endpoints
 app.post('/api/comprehension', async (req, res) => {
     const { lessonId, answers } = req.body;
