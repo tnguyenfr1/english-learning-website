@@ -67,29 +67,24 @@ const mongoStore = new MongoStore({
 });
 
 mongoStore.on('connected', () => console.log('MongoStore connected'));
-mongoStore.on('error', (err) => console.error('MongoStore error (using memory store):', err.message));
+mongoStore.on('error', (err) => console.error('MongoStore error:', err.message));
 
 // Wrap MongoStore initialization to catch unhandled rejections
-let sessionStore;
+let sessionStore = mongoStore;
 try {
-    sessionStore = process.env.NODE_ENV === 'production' ? mongoStore : new session.MemoryStore();
-    console.log('Session store initialized:', process.env.NODE_ENV === 'production' ? 'MongoStore' : 'MemoryStore');
+    console.log('Initializing session store as MongoStore with URI:', mongoURI.replace(/:([^:@]+)@/, ':****@'));
 } catch (err) {
-    console.error('Failed to initialize MongoStore, falling back to MemoryStore:', err.message);
+    console.error('MongoStore init failed, using MemoryStore:', err.message);
     sessionStore = new session.MemoryStore();
 }
 
-(async () => {
-    const dbInstance = await ensureDBConnection();
-    if (!dbInstance) console.error('Initial DB connection failed - running without DB');
-})();
 app.use(session({
     secret: process.env.SESSION_SECRET || 'fallback-secret',
     resave: false,
     saveUninitialized: false,
     store: sessionStore,
     cookie: {
-        maxAge: 1000 * 60 * 60 * 24, // 1 day
+        maxAge: 1000 * 60 * 60 * 24,
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
