@@ -5,8 +5,8 @@ const MongoStore = require('connect-mongodb-session')(session);
 const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
-const crypto = require('crypto'); // Added for reset tokens
-const axios = require('axios'); // Added for LanguageTool
+const crypto = require('crypto');
+const axios = require('axios');
 require('dotenv').config();
 
 // App Setup
@@ -69,13 +69,20 @@ const mongoStore = new MongoStore({
 mongoStore.on('connected', () => console.log('MongoStore connected'));
 mongoStore.on('error', (err) => console.error('MongoStore error (using memory store):', err.message));
 
-const sessionStore = process.env.NODE_ENV === 'production' ? mongoStore : new session.MemoryStore();
+// Wrap MongoStore initialization to catch unhandled rejections
+let sessionStore;
+try {
+    sessionStore = process.env.NODE_ENV === 'production' ? mongoStore : new session.MemoryStore();
+    console.log('Session store initialized:', process.env.NODE_ENV === 'production' ? 'MongoStore' : 'MemoryStore');
+} catch (err) {
+    console.error('Failed to initialize MongoStore, falling back to MemoryStore:', err.message);
+    sessionStore = new session.MemoryStore();
+}
 
 (async () => {
     const dbInstance = await ensureDBConnection();
     if (!dbInstance) console.error('Initial DB connection failed - running without DB');
 })();
-
 app.use(session({
     secret: process.env.SESSION_SECRET || 'fallback-secret',
     resave: false,
