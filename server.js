@@ -1,26 +1,36 @@
+// Dependencies
 const express = require('express');
 const session = require('express-session');
 const MongoStore = require('connect-mongodb-session')(session);
 const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer'); // Added
+const nodemailer = require('nodemailer');
+const crypto = require('crypto'); // Added for reset tokens
+const axios = require('axios'); // Added for LanguageTool
 require('dotenv').config();
 
+// App Setup
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
 console.log('Server starting...');
 
+// MongoDB Setup
 const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://admin:securepassword123@englishlearningcluster.bhzo4.mongodb.net/english_learning?retryWrites=true&w=majority&appName=EnglishLearningCluster';
 let client;
 let db;
+
 async function connectDB() {
     if (!client) {
-        console.log('Attempting MongoDB connection with URI:', mongoURI.replace(/:([^:@]+)@/, ':****@')); // Mask password
+        console.log('Attempting MongoDB connection with URI:', mongoURI.replace(/:([^:@]+)@/, ':****@'));
         const start = Date.now();
         try {
-            client = new MongoClient(mongoURI, { serverSelectionTimeoutMS: 10000 }); // Reduce timeout
+            client = new MongoClient(mongoURI, { 
+                serverSelectionTimeoutMS: 10000, 
+                connectTimeoutMS: 15000, 
+                socketTimeoutMS: 20000 
+            });
             await client.connect();
             db = client.db('english_learning');
             console.log(`MongoDB connected in ${Date.now() - start}ms`);
@@ -32,27 +42,34 @@ async function connectDB() {
     return db;
 }
 
-async function ensureDBConnection() {
-    if (!db) {
+async function ensureDBConnection(retries = 3) {
+    for (let i = 0; i < retries; i++) {
         try {
-            return await connectDB();
+            if (!db) return await connectDB();
+            return db;
         } catch (err) {
-            console.error('DB connection retry failed:', err.message);
-            return null;
+            console.error(`DB connection attempt ${i + 1}/${retries} failed:`, err.message);
+            if (i === retries - 1) {
+                console.error('All DB connection attempts failed');
+                return null;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
-    return db;
 }
 
-const store = new MongoStore({
+// Session Setup
+const mongoStore = new MongoStore({
     uri: mongoURI,
     databaseName: 'english_learning',
     collection: 'sessions',
     autoRemove: 'native'
 });
 
-store.on('connected', () => console.log('MongoStore connected'));
-store.on('error', (err) => console.error('MongoStore error (continuing without session store):', err.message));
+mongoStore.on('connected', () => console.log('MongoStore connected'));
+mongoStore.on('error', (err) => console.error('MongoStore error (using memory store):', err.message));
+
+const sessionStore = process.env.NODE_ENV === 'production' ? mongoStore : new session.MemoryStore();
 
 (async () => {
     const dbInstance = await ensureDBConnection();
@@ -63,9 +80,9 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'fallback-secret',
     resave: false,
     saveUninitialized: false,
-    store: store,
+    store: sessionStore,
     cookie: {
-        maxAge: 1000 * 60 * 60 * 24,
+        maxAge: 1000 * 60 * 60 * 24, // 1 day
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
@@ -74,6 +91,7 @@ app.use(session({
     name: 'connect.sid'
 }));
 
+// Middleware
 app.use(async (req, res, next) => {
     const start = Date.now();
     res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
@@ -84,7 +102,7 @@ app.use(async (req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
-        return res.status(200).end(); // Handle preflight
+        return res.status(200).end();
     }
 
     const dbInstance = await ensureDBConnection();
@@ -103,92 +121,7 @@ app.use(async (req, res, next) => {
     console.log(`Middleware took ${Date.now() - start}ms`);
     next();
 });
-// Nodemailer setup (example for signup)
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
 
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    console.log('Login attempt:', email);
-    try {
-        const start = Date.now();
-        const db = await ensureDBConnection();
-        if (!db) return res.status(503).json({ error: 'Database unavailable' });
-        const user = await db.collection('users').findOne({ email });
-        if (!user || !(await bcrypt.compare(password, user.password))) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-        req.session.userId = user._id.toString();
-        console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        try {
-            await new Promise((resolve, reject) => {
-                req.session.save((err) => {
-                    if (err) reject(err);
-                    else resolve();
-                });
-            });
-        } catch (err) {
-            console.error('Session save failed:', err.message);
-            return res.status(500).json({ error: 'Session error' });
-        }
-        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
-        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
-        res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
-        console.log(`Login took ${Date.now() - start}ms`);
-    } catch (err) {
-        console.error('Login error:', err.message);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-app.post('/api/signup', async (req, res) => {
-    const { name, email, password } = req.body;
-    try {
-        const db = await ensureDBConnection();
-        const existingUser = await db.collection('users').findOne({ email });
-        if (existingUser) return res.status(400).json({ error: 'Email already exists' });
-        
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = { name, email, password: hashedPassword };
-        const result = await db.collection('users').insertOne(user);
-        
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'Welcome to English Learning!',
-            text: `Hi ${name}, welcome to English Learning! Your account is ready.`
-        };
-        await transporter.sendMail(mailOptions);
-        console.log(`Verification email sent to: ${email}`);
-        
-        res.status(201).json({ message: 'User created', userId: result.insertedId });
-    } catch (err) {
-        console.error('Signup error:', err.message);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-
-
-app.get('/api/user-check', async (req, res) => {
-    console.log('User check:', { sessionId: req.sessionID, userId: req.session.userId });
-    if (!req.session.userId) {
-        return res.json({ loggedIn: false, name: null });
-    }
-    const db = await ensureDBConnection();
-    if (!db) return res.status(503).json({ error: 'Database unavailable' });
-    const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
-    res.json({ loggedIn: true, name: user ? user.name : 'User' });
-});
-
-// Authentication Middleware
 const requireLogin = (req, res, next) => {
     if (!req.session.userId) {
         console.log('No session userId - access denied');
@@ -196,6 +129,15 @@ const requireLogin = (req, res, next) => {
     }
     next();
 };
+
+// Nodemailer Setup
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
 
 // Utility Functions
 function normalizeText(text) {
@@ -241,14 +183,117 @@ async function updateUserScore(userId, db) {
     console.log('Updated titles for user scores');
 }
 
+function mapToCEFR(score, wordCount, grammarScore, styleScore) {
+    const reasons = [];
+    if (score < 20) {
+        reasons.push('Very basic text with significant errors.');
+        return { level: 'A1', reason: reasons.join(' ') };
+    }
+    if (score < 40) {
+        reasons.push('Simple text with frequent errors.');
+        return { level: 'A2', reason: reasons.join(' ') };
+    }
+    if (score < 60) {
+        reasons.push('Coherent ideas but noticeable errors.');
+        return { level: 'B1', reason: reasons.join(' ') };
+    }
+    if (score < 80) {
+        reasons.push('Complex ideas with some errors.');
+        return { level: 'B2', reason: reasons.join(' ') };
+    }
+    if (score < 95) {
+        reasons.push('Fluent text with minor errors.');
+        return { level: 'C1', reason: reasons.join(' ') };
+    }
+    reasons.push('Near-native fluency with minimal errors.');
+    if (wordCount < 50) reasons.push('Text too short—aim for 50+ words.');
+    if (grammarScore < 70) reasons.push('Work on grammar accuracy.');
+    if (styleScore < 70) reasons.push('Improve style.');
+    return { level: 'C2', reason: reasons.join(' ') };
+}
 
+// Routes - Auth
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    console.log('Login attempt:', email);
+    try {
+        const start = Date.now();
+        const db = await ensureDBConnection();
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
+        const user = await db.collection('users').findOne({ email });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        req.session.userId = user._id.toString();
+        console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+        try {
+            await new Promise((resolve, reject) => {
+                req.session.save((err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
+        } catch (err) {
+            console.error('Session save failed:', err.message);
+            return res.status(500).json({ error: 'Session error' });
+        }
+        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
+        console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
+        res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
+        res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
+        console.log(`Login took ${Date.now() - start}ms`);
+    } catch (err) {
+        console.error('Login error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/signup', async (req, res) => {
+    const { name, email, password } = req.body;
+    try {
+        const db = await ensureDBConnection();
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
+        const existingUser = await db.collection('users').findOne({ email });
+        if (existingUser) return res.status(400).json({ error: 'Email already exists' });
+        
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = { name, email, password: hashedPassword };
+        const result = await db.collection('users').insertOne(user);
+        
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Welcome to English Learning!',
+            text: `Hi ${name}, welcome to English Learning! Your account is ready.`
+        };
+        await transporter.sendMail(mailOptions);
+        console.log(`Verification email sent to: ${email}`);
+        
+        res.status(201).json({ message: 'User created', userId: result.insertedId });
+    } catch (err) {
+        console.error('Signup error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/user-check', async (req, res) => {
+    console.log('User check:', { sessionId: req.sessionID, userId: req.session.userId });
+    if (!req.session.userId) {
+        return res.json({ loggedIn: false, name: null });
+    }
+    const db = await ensureDBConnection();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
+    const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
+    res.json({ loggedIn: true, name: user ? user.name : 'User' });
+});
 
 app.get('/api/verify', async (req, res) => {
     const { token } = req.query;
     console.log('Verification attempt with token:', token);
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).send('Database unavailable');
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const users = db.collection('users');
         const user = await users.findOne({ verificationToken: token });
         if (!user) {
@@ -272,7 +317,7 @@ app.post('/api/reset-password', async (req, res) => {
     console.log('Password reset request for:', email);
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const users = db.collection('users');
         const user = await users.findOne({ email });
         if (!user) return res.status(404).json({ error: 'Email not found.' });
@@ -357,7 +402,7 @@ app.post('/api/reset-password-submit', async (req, res) => {
     console.log('Password reset submission for token:', token);
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const users = db.collection('users');
         const user = await users.findOne({ resetToken: token });
         if (!user) return res.status(400).json({ error: 'Invalid or expired token.' });
@@ -375,12 +420,22 @@ app.post('/api/reset-password-submit', async (req, res) => {
     }
 });
 
+app.get('/api/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Logout error:', err.message);
+            return res.status(500).json({ error: 'Logout failed' });
+        }
+        console.log('Logout successful');
+        res.redirect('/');
+    });
+});
 
-
+// Routes - User Progress
 app.get('/api/user-progress', requireLogin, async (req, res) => {
     try {
         const db = await ensureDBConnection();
-        if (!db) throw new Error('Database unavailable');
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const user = await db.collection('users').findOne({ _id: new ObjectId(req.session.userId) });
         const progress = [];
         if (user.writingScores) {
@@ -391,14 +446,14 @@ app.get('/api/user-progress', requireLogin, async (req, res) => {
                 timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp || Date.now())
             })));
         }
-        // ... (rest of progress logic unchanged) ...
         res.json(progress.sort((a, b) => b.timestamp - a.timestamp));
     } catch (err) {
         console.error('Progress error:', err.message);
         res.status(500).json({ error: 'Failed to fetch progress' });
     }
 });
-// Public Endpoints
+
+// Routes - Public Data
 app.get('/api/lessons', async (req, res) => {
     try {
         const db = await ensureDBConnection();
@@ -410,13 +465,11 @@ app.get('/api/lessons', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+
 app.get('/api/references', async (req, res) => {
     try {
         const db = await ensureDBConnection();
-        if (!db) {
-            console.error('References: DB unavailable');
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const references = await db.collection('references').find({}).toArray();
         res.json(references);
     } catch (err) {
@@ -460,12 +513,13 @@ app.get('/api/leaderboard', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-// Activity Submission Endpoints
+
+// Routes - Activity Submission
 app.post('/api/comprehension', async (req, res) => {
     const { lessonId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(lessonId) });
         if (!lesson || !lesson.comprehension?.questions) {
             return res.status(404).json({ error: 'Lesson or comprehension questions not found' });
@@ -502,7 +556,7 @@ app.post('/api/homework', async (req, res) => {
     const { lessonId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const lesson = await db.collection('lessons').findOne({ _id: new ObjectId(lessonId) });
         if (!lesson || !lesson.homework) return res.status(404).json({ error: 'Lesson or homework not found' });
 
@@ -533,7 +587,7 @@ app.post('/api/submit-quiz', async (req, res) => {
     const { quizId, answers } = req.body;
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         const quiz = await db.collection('quizzes').findOne({ _id: new ObjectId(quizId) });
         if (!quiz || !quiz.questions) return res.status(404).json({ error: 'Quiz or questions not found' });
 
@@ -572,7 +626,7 @@ app.post('/api/pronunciation', async (req, res) => {
     }
     try {
         const db = await ensureDBConnection();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
+        if (!db) return res.status(503).json({ error: 'Database unavailable' });
         if (req.session.userId) {
             await db.collection('users').updateOne(
                 { _id: new ObjectId(req.session.userId) },
@@ -654,6 +708,7 @@ app.post('/api/grade-writing', async (req, res) => {
         console.error('Grading error:', error.message);
         const wordCount = text.split(/\s+/).length;
         const score = Math.min(wordCount / 50 * 100, 100);
+        
         const cefrData = mapToCEFR(score, wordCount, 100, 100);
         res.json({
             score,
