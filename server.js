@@ -78,20 +78,18 @@ mongoStore.on('error', (err) => console.error('MongoStore error (continuing):', 
 
 // Force MemoryStore fallback if MongoStore fails
 let sessionStore;
-try {
-    console.log('Initializing session store as MongoStore with URI:', mongoURI.replace(/:([^:@]+)@/, ':****@'));
-    sessionStore = mongoStore;
-    // Test connection immediately
-    mongoStore.clientPromise = mongoStore.clientPromise || mongoStore.connection; // Ensure promise exists
-    await Promise.race([
-        mongoStore.clientPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('MongoStore init timeout')), 10000))
-    ]);
-    console.log('MongoStore initialized successfully');
-} catch (err) {
-    console.error('MongoStore init failed, using MemoryStore:', err.message);
-    sessionStore = new session.MemoryStore();
-}
+(async () => {
+    try {
+        await Promise.race([
+            mongoStore.clientPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('MongoStore init timeout')), 10000))
+        ]);
+        console.log('MongoStore initialized successfully');
+    } catch (err) {
+        console.error('MongoStore init failed, using MemoryStore:', err.message);
+        sessionStore = new session.MemoryStore();
+    }
+})();
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'fallback-secret',
