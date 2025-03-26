@@ -76,6 +76,17 @@ app.use(session({
 
 app.use(async (req, res, next) => {
     const start = Date.now();
+    res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
+        ? 'https://english-learning-website-olive.vercel.app' 
+        : 'http://localhost:3000');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end(); // Handle preflight
+    }
+
     const dbInstance = await ensureDBConnection();
     if (!dbInstance) {
         console.error(`DB unavailable for ${req.method} ${req.path}`);
@@ -89,11 +100,6 @@ app.use(async (req, res, next) => {
     } catch (err) {
         console.error('Session fetch error:', err.message);
     }
-    res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
-        ? 'https://english-learning-website-olive.vercel.app' 
-        : 'http://localhost:3000');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     console.log(`Middleware took ${Date.now() - start}ms`);
     next();
 });

@@ -179,27 +179,27 @@
             }
         }
 
-        authForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    console.log('Submitting login:', email);
-    try {
-        const res = await fetch('https://english-learning-website-olive.vercel.app/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ email, password })
-        });
-        console.log('Fetch status:', res.status, 'Cookies:', document.cookie);
-        const data = await res.json();
-        console.log('Fetch response:', data);
-        if (!res.ok) throw new Error(data.error || 'Login failed');
-        localStorage.setItem('userName', data.name); // Store name for dashboard
-        window.location.href = '/dashboard.html';
-    } catch (err) {
-        console.error('Login fetch error:', err.message);
-        document.getElementById('auth-error').textContent = err.message;
+    authForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        console.log('Submitting login:', email);
+        try {
+            const res = await fetch('http://localhost:3000/api/login', { // Local server
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email, password })
+            });
+            console.log('Fetch status:', res.status, 'Cookies:', document.cookie);
+            const data = await res.json();
+            console.log('Fetch response:', data);
+            if (!res.ok) throw new Error(data.error || 'Login failed');
+            localStorage.setItem('userName', data.name);
+            window.location.href = '/dashboard.html';
+    }   catch (err) {
+            console.error('Login fetch error:', err.message);
+            document.getElementById('auth-error').textContent = err.message;
     }
 });
 
