@@ -75,12 +75,9 @@ const mongoStore = new MongoStore({
 mongoStore.on('connected', () => console.log('MongoStore connected'));
 mongoStore.on('error', (err) => console.error('MongoStore error:', err.message));
 
-// Wrap MongoStore to prevent crashes
-let sessionStore;
+let sessionStore = mongoStore;
 try {
-    sessionStore = mongoStore;
     console.log('Initializing session store as MongoStore with URI:', mongoURI.replace(/:([^:@]+)@/, ':****@'));
-    mongoStore.once('connected', () => console.log('MongoStore fully initialized'));
 } catch (err) {
     console.error('MongoStore init failed, using MemoryStore:', err.message);
     sessionStore = new session.MemoryStore();
@@ -93,9 +90,9 @@ app.use(session({
     store: sessionStore,
     cookie: {
         maxAge: 1000 * 60 * 60 * 24,
-        secure: process.env.NODE_ENV === 'production',
+        secure: true, // Always secure for Vercel HTTPS
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        sameSite: 'none', // Vercel needs this for cross-origin
         path: '/'
     },
     name: 'connect.sid'
@@ -235,18 +232,14 @@ app.post('/api/login', async (req, res) => {
         console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         await req.session.save();
         console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+        // Wait briefly and check DB
+        await new Promise(resolve => setTimeout(resolve, 100)); // Give MongoStore a beat
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
         if (!sessionDoc) {
-            console.error('Session not found in DB after save');
-            await db.collection('sessions').insertOne({
-                _id: req.sessionID,
-                expires: new Date(Date.now() + 1000 * 60 * 60 * 24),
-                session: { userId: req.session.userId }
-            });
-            console.log('Manually inserted session');
-        } else {
-            console.log('Session in DB:', JSON.stringify(sessionDoc));
+            console.error('MongoStore failed to save session');
+            return res.status(500).json({ error: 'Session save failed' });
         }
+        console.log('Session in DB:', JSON.stringify(sessionDoc));
         const cookieString = `connect.sid=${req.sessionID}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=86400`;
         res.setHeader('Set-Cookie', cookieString);
         console.log('Set-Cookie header:', cookieString);
