@@ -27,15 +27,16 @@ async function connectDB() {
         const start = Date.now();
         try {
             client = new MongoClient(mongoURI, { 
-                serverSelectionTimeoutMS: 10000, 
-                connectTimeoutMS: 15000, 
-                socketTimeoutMS: 20000 
+                serverSelectionTimeoutMS: 30000, // Up from 20s
+                connectTimeoutMS: 40000, // Up from 15s
+                socketTimeoutMS: 50000 // Up from 20s
             });
             await client.connect();
             db = client.db('english_learning');
             console.log(`MongoDB connected in ${Date.now() - start}ms`);
         } catch (err) {
             console.error('MongoDB connection failed:', err.message);
+            client = null; // Reset to retry next time
             throw err;
         }
     }
@@ -63,16 +64,23 @@ const mongoStore = new MongoStore({
     uri: mongoURI,
     databaseName: 'english_learning',
     collection: 'sessions',
-    autoRemove: 'native'
+    autoRemove: 'native',
+    connectionOptions: { 
+        serverSelectionTimeoutMS: 30000, 
+        connectTimeoutMS: 40000, 
+        socketTimeoutMS: 50000 
+    }
 });
 
 mongoStore.on('connected', () => console.log('MongoStore connected'));
 mongoStore.on('error', (err) => console.error('MongoStore error:', err.message));
 
-// Wrap MongoStore initialization to catch unhandled rejections
-let sessionStore = mongoStore;
+// Wrap MongoStore to prevent crashes
+let sessionStore;
 try {
+    sessionStore = mongoStore;
     console.log('Initializing session store as MongoStore with URI:', mongoURI.replace(/:([^:@]+)@/, ':****@'));
+    mongoStore.once('connected', () => console.log('MongoStore fully initialized'));
 } catch (err) {
     console.error('MongoStore init failed, using MemoryStore:', err.message);
     sessionStore = new session.MemoryStore();
@@ -214,22 +222,30 @@ app.post('/api/login', async (req, res) => {
     try {
         const start = Date.now();
         const db = await ensureDBConnection();
-        if (!db) return res.status(503).json({ error: 'Database unavailable' });
+        if (!db) {
+            console.error('DB unavailable during login');
+            return res.status(503).json({ error: 'Database unavailable' });
+        }
         const user = await db.collection('users').findOne({ email });
         if (!user || !(await bcrypt.compare(password, user.password))) {
+            console.log('Invalid credentials for:', email);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         req.session.userId = user._id.toString();
         console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         await new Promise((resolve, reject) => {
             req.session.save((err) => {
-                if (err) reject(err);
-                else resolve();
+                if (err) {
+                    console.error('Session save failed:', err.message);
+                    reject(err);
+                } else {
+                    console.log('Session saved successfully');
+                    resolve();
+                }
             });
         });
-        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        console.log('Session in DB after save:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
+        console.log('Session in DB:', sessionDoc ? JSON.stringify(sessionDoc) : 'Not found');
         res.setHeader('Set-Cookie', `connect.sid=${req.sessionID}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=None' : 'SameSite=Lax'}`);
         res.json({ message: 'Login successful', userId: req.session.userId, name: user.name });
         console.log(`Login took ${Date.now() - start}ms`);
