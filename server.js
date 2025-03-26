@@ -27,16 +27,18 @@ async function connectDB() {
         const start = Date.now();
         try {
             client = new MongoClient(mongoURI, { 
-                serverSelectionTimeoutMS: 30000, // Up from 20s
-                connectTimeoutMS: 40000, // Up from 15s
-                socketTimeoutMS: 50000 // Up from 20s
+                serverSelectionTimeoutMS: 30000, 
+                connectTimeoutMS: 40000, 
+                socketTimeoutMS: 50000,
+                maxPoolSize: 10, // More connections for serverless
+                retryWrites: true 
             });
             await client.connect();
             db = client.db('english_learning');
             console.log(`MongoDB connected in ${Date.now() - start}ms`);
         } catch (err) {
             console.error('MongoDB connection failed:', err.message);
-            client = null; // Reset to retry next time
+            client = null;
             throw err;
         }
     }
@@ -46,12 +48,11 @@ async function connectDB() {
 async function ensureDBConnection(retries = 3) {
     for (let i = 0; i < retries; i++) {
         try {
-            if (!db) return await connectDB();
-            return db;
+            return await connectDB();
         } catch (err) {
             console.error(`DB connection attempt ${i + 1}/${retries} failed:`, err.message);
             if (i === retries - 1) {
-                console.error('All DB connection attempts failed');
+                console.error('All DB retries exhausted');
                 return null;
             }
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -73,11 +74,20 @@ const mongoStore = new MongoStore({
 });
 
 mongoStore.on('connected', () => console.log('MongoStore connected'));
-mongoStore.on('error', (err) => console.error('MongoStore error:', err.message));
+mongoStore.on('error', (err) => console.error('MongoStore error (continuing):', err.message));
 
-let sessionStore = mongoStore;
+// Force MemoryStore fallback if MongoStore fails
+let sessionStore;
 try {
     console.log('Initializing session store as MongoStore with URI:', mongoURI.replace(/:([^:@]+)@/, ':****@'));
+    sessionStore = mongoStore;
+    // Test connection immediately
+    mongoStore.clientPromise = mongoStore.clientPromise || mongoStore.connection; // Ensure promise exists
+    await Promise.race([
+        mongoStore.clientPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('MongoStore init timeout')), 10000))
+    ]);
+    console.log('MongoStore initialized successfully');
 } catch (err) {
     console.error('MongoStore init failed, using MemoryStore:', err.message);
     sessionStore = new session.MemoryStore();
@@ -90,9 +100,9 @@ app.use(session({
     store: sessionStore,
     cookie: {
         maxAge: 1000 * 60 * 60 * 24,
-        secure: true, // Always secure for Vercel HTTPS
+        secure: true,
         httpOnly: true,
-        sameSite: 'none', // Vercel needs this for cross-origin
+        sameSite: 'none',
         path: '/'
     },
     name: 'connect.sid'
@@ -229,17 +239,9 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         req.session.userId = user._id.toString();
-        console.log('Before save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
+        console.log('Setting session - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         await req.session.save();
-        console.log('After save - SessionID:', req.sessionID, 'UserID:', req.session.userId);
-        // Wait briefly and check DB
-        await new Promise(resolve => setTimeout(resolve, 100)); // Give MongoStore a beat
-        const sessionDoc = await db.collection('sessions').findOne({ _id: req.sessionID });
-        if (!sessionDoc) {
-            console.error('MongoStore failed to save session');
-            return res.status(500).json({ error: 'Session save failed' });
-        }
-        console.log('Session in DB:', JSON.stringify(sessionDoc));
+        console.log('Session saved - SessionID:', req.sessionID, 'UserID:', req.session.userId);
         const cookieString = `connect.sid=${req.sessionID}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=86400`;
         res.setHeader('Set-Cookie', cookieString);
         console.log('Set-Cookie header:', cookieString);
